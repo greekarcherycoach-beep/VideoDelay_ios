@@ -1,0 +1,1509 @@
+<!DOCTYPE html>
+<html lang="el">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover,interactive-widget=resizes-content">
+<meta name="color-scheme" content="dark">
+<meta name="format-detection" content="telephone=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#000000">
+<title>Video Delay</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" type="image/png" href="icons/icon-192.png">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<meta name="apple-mobile-web-app-title" content="Video Delay">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<style>
+:root{--panel:rgba(18,20,27,.84);--line:rgba(255,255,255,.16);--acc:#0a84ff;--txt:#f2f4f8;--mut:#9aa3b2;--bh:104px}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent;-webkit-user-select:none;user-select:none}
+html,body{margin:0;height:100%;background:#000;color:var(--txt);font:16px/1.3 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;overflow:hidden;overscroll-behavior:none}
+button,select,input{font:inherit;color:inherit}
+[hidden]{display:none!important}
+
+/* ---------- Οθόνες εκκίνησης / κινητού ---------- */
+.screen{position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px;padding:24px;background:radial-gradient(circle at 50% 20%,#17202e,#07090d);text-align:center;overflow:auto}
+.screen h1{margin:0;font-size:34px;letter-spacing:.5px}
+.screen p{margin:0;color:var(--mut);max-width:560px}
+.cards{display:flex;gap:16px;flex-wrap:wrap;justify-content:center}
+.card{width:270px;padding:26px 18px;border-radius:22px;background:#1a2130;border:1px solid var(--line);cursor:pointer;display:flex;flex-direction:column;gap:8px;align-items:center}
+.card:active{transform:scale(.98);background:#222c40}
+.card b{font-size:20px}.card span{color:var(--mut);font-size:14px}.card i{font-size:44px;font-style:normal}
+.hint{font-size:13px;color:var(--mut);max-width:520px}
+
+
+/* ---------- Archery Lab branding (πρώτη σελίδα) ---------- */
+#role{gap:14px;background:
+  radial-gradient(circle at 100% 0%,rgba(255,176,32,.16),transparent 45%),
+  linear-gradient(rgba(255,255,255,.03) 1px,transparent 1px) 0 0/32px 32px,
+  linear-gradient(90deg,rgba(255,255,255,.03) 1px,transparent 1px) 0 0/32px 32px,
+  #0a0d12}
+#role .brand{font-size:46px;font-weight:800;letter-spacing:.3px;margin:0;line-height:1.1;background:linear-gradient(90deg,#ffc21a,#ff9a14);-webkit-background-clip:text;background-clip:text;color:transparent}
+#role .sub{font-size:24px;font-weight:700;letter-spacing:.5px;margin:0;color:#d5dbe6;background:linear-gradient(90deg,#e6ebf3,#b9c3d6);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent}
+#role .appicon{width:72px;height:72px;border-radius:22px;margin:6px 0 10px;display:flex;align-items:center;justify-content:center;background:linear-gradient(145deg,#ffc21a,#ff8f0f);box-shadow:0 0 28px rgba(255,160,20,.45),0 6px 18px rgba(0,0,0,.5)}
+#role .appicon svg{width:42px;height:42px;fill:none;stroke:#111;stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round}
+
+/* ---------- Σκηνή ---------- */
+#stage{position:fixed;inset:0;background:#000;overflow:hidden}
+#panes{position:absolute;inset:0;display:flex;flex-direction:row}
+#panes.col{flex-direction:column}
+.pane{position:relative;flex:1 1 0;min-width:0;min-height:0;overflow:hidden;background:#000}
+.pane.off{display:none}
+#panes.dual .pane[data-pos=right]{border-left:3px solid #26304a}
+#panes.dual .pane[data-pos=bottom]{border-top:3px solid #26304a}
+.pane video{position:absolute;inset:0;width:100%;height:100%;object-fit:var(--fit,contain);opacity:0;pointer-events:none;background:#000}
+.pane video.on{opacity:1}
+.pane video.pip{inset:auto;left:14px;top:118px;width:26%;max-width:240px;height:auto;aspect-ratio:16/9;border-radius:12px;border:2px solid var(--line);object-fit:cover;z-index:3;opacity:1}
+body.mirror #paneA{--mx:-1}
+body.mirrorB #paneB{--mx:-1}
+.pane{touch-action:none}
+.pane video{transform:translate(var(--zx,0%),var(--zy,0%)) scale(var(--zm,1)) scaleX(var(--mx,1));will-change:transform}
+.pane video.pip{transform:scaleX(var(--mx,1));will-change:auto}
+.tag{display:none;position:absolute;left:12px;top:76px;z-index:3;background:rgba(0,0,0,.55);padding:6px 12px;border-radius:999px;font-size:14px;pointer-events:none}
+#panes.dual .tag{display:block}
+.pmsg{position:absolute;inset:0;z-index:4;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;text-align:center;pointer-events:none;font-size:20px;text-shadow:0 2px 10px #000;padding:20px}
+.pmsg big{font-size:72px;font-weight:700;line-height:1}
+.pmsg small{font-size:15px;color:#cfd6e4}
+#draw{position:absolute;inset:0;width:100%;height:100%;z-index:2;touch-action:none;pointer-events:none}
+body.drawing #draw{pointer-events:auto}
+#msg{position:absolute;inset:0;z-index:4;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;text-align:center;pointer-events:none;font-size:22px;text-shadow:0 2px 10px #000;padding:20px}
+#msg big{font-size:84px;font-weight:700;line-height:1}
+#msg small{font-size:16px;color:#cfd6e4}
+
+/* ---------- Μπάρες ---------- */
+.bar{position:fixed;z-index:10;background:var(--panel);-webkit-backdrop-filter:blur(14px);backdrop-filter:blur(14px);border:1px solid var(--line);border-radius:18px;padding:8px}
+#top{position:fixed;z-index:10;top:10px;left:10px;right:10px;display:flex;flex-wrap:wrap;gap:8px;align-items:center;justify-content:space-between;pointer-events:none}
+#top>*{pointer-events:auto}
+#top .bar{position:static}
+#top .grp{display:flex;gap:6px;align-items:center}
+body.noui #top,body.noui .bar,body.noui #settings,body.noui #tools,body.noui #props,body.noui #bottom,body.noui .tag{display:none!important}
+#hot{display:none;position:fixed;z-index:12;top:0;right:0;width:96px;height:96px}
+body.noui #hot{display:block}
+body.noui{cursor:none}
+.btn{min-width:48px;min-height:48px;padding:0 14px;border-radius:14px;border:1px solid var(--line);background:rgba(255,255,255,.08);cursor:pointer;display:inline-flex;align-items:center;justify-content:center;gap:6px;white-space:nowrap}
+.btn:active{background:rgba(255,255,255,.2)}
+.btn.on{background:var(--acc);border-color:var(--acc)}
+.btn svg{width:26px;height:26px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.seg{display:inline-flex;border-radius:14px;overflow:hidden;border:1px solid var(--line)}
+.seg button{min-height:46px;padding:0 14px;border:0;background:rgba(255,255,255,.07);cursor:pointer;border-right:1px solid var(--line)}
+.seg button:last-child{border-right:0}
+.seg button.on{background:var(--acc)}
+#chip{padding:10px 16px;border-radius:999px;font-weight:600;font-variant-numeric:tabular-nums;white-space:nowrap}
+#chip.live{background:#d70015}
+#tools{right:10px;top:76px;display:none;flex-direction:column;gap:6px}
+body.drawing #tools{display:flex}
+#props{left:10px;right:10px;bottom:10px;display:none;flex-wrap:wrap;gap:12px 18px;align-items:center}
+body.drawing #props{display:flex}
+body[data-mode=delay] #props{bottom:var(--bh)}
+#props label{display:flex;gap:8px;align-items:center;color:var(--mut);font-size:14px}
+#props input[type=range]{width:130px}
+#swatches{display:flex;gap:6px;align-items:center}
+.sw{width:36px;height:36px;border-radius:50%;border:3px solid rgba(255,255,255,.25);cursor:pointer;padding:0}
+.sw.on{border-color:#fff;transform:scale(1.12)}
+#colorPick{width:44px;height:36px;border:0;padding:0;background:none}
+#bottom{left:10px;right:10px;bottom:10px;display:none;padding:0;overflow:hidden}
+body[data-mode=delay] #bottom{display:block}
+.brow{display:flex;flex-wrap:wrap;gap:8px 20px;align-items:center;justify-content:center;padding:8px 12px}
+.ctl{display:flex;gap:8px;align-items:center}
+.ctl>span{color:var(--mut);font-size:14px}
+.ctl output{min-width:42px;font-weight:700;font-variant-numeric:tabular-nums}
+.sb{width:44px;height:44px;border-radius:12px;border:1px solid var(--line);background:rgba(255,255,255,.08);font-size:22px;cursor:pointer}
+.ctl input[type=range]{width:110px}
+#cd{position:fixed;width:var(--cd-size,108px);height:var(--cd-size,108px);opacity:var(--cd-op,1);z-index:9;pointer-events:none;display:flex;flex-direction:column;align-items:center;justify-content:center;text-shadow:0 1px 6px #000}
+#cd[data-pos=tl]{left:14px;top:80px}#cd[data-pos=tr]{right:14px;top:80px}
+#cd[data-pos=bl]{left:14px;bottom:14px}#cd[data-pos=br]{right:14px;bottom:14px}
+body[data-mode=delay]:not(.noui) #cd[data-pos=bl],body[data-mode=delay]:not(.noui) #cd[data-pos=br]{bottom:var(--bh,104px)}
+body.noui #cd[data-pos=tl],body.noui #cd[data-pos=tr]{top:14px}
+#cd svg{position:absolute;inset:0;width:100%;height:100%}
+#cd .bg{fill:rgba(0,0,0,.5);stroke:rgba(255,255,255,.2)}
+#cd .fg{fill:none;stroke:var(--c-play,#0a84ff);stroke-linecap:round}
+#cd[data-p=rec] .fg{stroke:var(--c-rec,#ff3b30)}#cd[data-p=wait] .fg{stroke:var(--c-wait,#ff9f0a)}#cd[data-p=pause] .fg{stroke:#9aa3b2}
+#cd b{position:relative;line-height:1;font-weight:800;font-variant-numeric:tabular-nums}
+#cd small{position:relative;letter-spacing:.3px;margin-top:3px;color:#dfe6f3;text-transform:uppercase}
+#cd.nolabel small{display:none}
+.pane video.pip{top:var(--pip-top,204px)!important}
+body.noui .pane video.pip{top:var(--pip-top-n,134px)!important}
+.tag{left:var(--tag-left,136px)!important;top:var(--tag-top,92px)!important}
+#splitter{position:absolute;z-index:6;touch-action:none;-webkit-user-select:none}
+#splitter.row{top:0;bottom:0;width:44px;margin-left:-22px;cursor:col-resize}
+#splitter.col{left:0;right:0;height:44px;margin-top:-22px;cursor:row-resize}
+#splitter i{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);background:rgba(255,255,255,.92);border-radius:99px;box-shadow:0 0 0 2px rgba(0,0,0,.5),0 2px 10px rgba(0,0,0,.5)}
+#splitter.row i{width:9px;height:90px}
+#splitter.col i{width:90px;height:9px}
+#splitter.drag i{background:#0a84ff}
+body.noui #splitter{display:none!important}
+.colrow{display:flex;gap:10px;align-items:center;justify-content:space-between;margin:8px 0;flex-wrap:wrap}
+.colrow label{display:flex;flex-direction:column;align-items:center;gap:4px;font-size:12px;color:var(--mut)}
+.colrow input[type=color]{width:64px;height:40px;border:1px solid var(--line);border-radius:10px;padding:2px;background:#1b2130}
+.tag{left:136px!important;top:92px!important}
+input[type=range]{accent-color:var(--acc);height:32px}
+
+/* ---------- Ρυθμίσεις ---------- */
+#settings{position:fixed;z-index:30;top:0;bottom:0;left:0;width:min(430px,94vw);transform:translateX(-104%);transition:transform .25s;overflow:auto;padding:16px;background:rgba(12,14,20,.97);border-right:1px solid var(--line)}
+#settings.open{transform:none}
+#settings.peek{opacity:.3}
+.pane video{filter:var(--flt,none)}
+.irow{display:grid;grid-template-columns:104px 1fr 56px;gap:8px;align-items:center;margin:4px 0;font-size:14px}
+.irow input{width:100%}.irow output{text-align:right;font-weight:700;font-variant-numeric:tabular-nums}
+.irow.hw{grid-template-columns:104px 1fr 56px}
+#settings h2{margin:4px 0 12px;font-size:20px;display:flex;justify-content:space-between;align-items:center}
+.set{margin:16px 0;padding-top:14px;border-top:1px solid var(--line)}
+.set h3{margin:0 0 10px;font-size:13px;letter-spacing:.8px;text-transform:uppercase;color:var(--mut)}
+.row{display:flex;justify-content:space-between;align-items:center;gap:10px;margin:8px 0}
+select{min-height:46px;border-radius:12px;background:#1b2130;border:1px solid var(--line);padding:0 10px;max-width:230px}
+.code{font:700 44px/1 ui-monospace,Menlo,Consolas,monospace;letter-spacing:8px;text-align:center;padding:14px;border-radius:14px;background:#1b2130;margin:10px 0}
+.note{font-size:13px;color:var(--mut)}
+#toast{position:fixed;z-index:50;left:50%;bottom:120px;transform:translate(-50%,20px);background:#222a3a;border:1px solid var(--line);padding:12px 18px;border-radius:14px;opacity:0;pointer-events:none;transition:.25s;max-width:90vw;text-align:center}
+#toast.show{opacity:1;transform:translate(-50%,0)}
+
+/* ---------- Κινητό (πομπός) ---------- */
+.big{min-height:56px;padding:0 26px;font-size:18px;font-weight:600}
+
+/* ---------- Βελτιστοποίηση για κινητό (Android) ---------- */
+:root{--sat:env(safe-area-inset-top,0px);--sar:env(safe-area-inset-right,0px);--sab:env(safe-area-inset-bottom,0px);--sal:env(safe-area-inset-left,0px);--th:80px}
+html,body{touch-action:manipulation;-webkit-text-size-adjust:100%;text-size-adjust:100%}
+.screen{justify-content:center;justify-content:safe center;overscroll-behavior:contain;padding:calc(20px + var(--sat)) calc(20px + var(--sar)) calc(20px + var(--sab)) calc(20px + var(--sal))}
+.card{width:min(88vw,270px)}
+.screen h1{font-size:clamp(24px,7vw,34px)}
+#top{top:calc(10px + var(--sat));left:calc(10px + var(--sal));right:calc(10px + var(--sar))}
+#bottom,#props{left:calc(10px + var(--sal));right:calc(10px + var(--sar));bottom:calc(10px + var(--sab))}
+#cd[data-pos=tl]{left:calc(14px + var(--sal));top:var(--th)}
+#cd[data-pos=tr]{right:calc(14px + var(--sar));top:var(--th)}
+#cd[data-pos=bl]{left:calc(14px + var(--sal));bottom:calc(14px + var(--sab))}
+#cd[data-pos=br]{right:calc(14px + var(--sar));bottom:calc(14px + var(--sab))}
+body.noui #cd[data-pos=tl],body.noui #cd[data-pos=tr]{top:calc(14px + var(--sat))}
+#tools{right:calc(10px + var(--sar));top:var(--th);max-height:calc(100vh - var(--th) - 20px);max-height:calc(100dvh - var(--th) - 20px);overflow-y:auto;overscroll-behavior:contain}
+.pane video.pip{left:calc(14px + var(--sal))}
+#toast{bottom:calc(120px + var(--sab))}
+#settings{padding:0 calc(16px + var(--sar)) calc(16px + var(--sab)) calc(16px + var(--sal));overscroll-behavior:contain}
+#settings h2{position:sticky;top:0;z-index:3;margin:0 calc(-16px - var(--sar)) 8px calc(-16px - var(--sal));padding:calc(10px + var(--sat)) calc(16px + var(--sar)) 10px calc(16px + var(--sal));background:rgba(12,14,20,.98)}
+.tgl{display:flex}
+body.bcol #bottom .ctl.sl{display:none}
+body.bcol #bottom .ctl.keep>span{display:none}
+@media (pointer:coarse){
+  :root{--panel:rgba(14,16,22,.92)}
+  .bar{-webkit-backdrop-filter:none;backdrop-filter:none}
+  input[type=range]{-webkit-appearance:none;appearance:none;background:transparent;height:38px;margin:0}
+  input[type=range]::-webkit-slider-runnable-track{height:6px;border-radius:3px;background:rgba(255,255,255,.25)}
+  input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;appearance:none;width:26px;height:26px;border-radius:50%;background:#fff;border:0;margin-top:-10px;box-shadow:0 1px 5px rgba(0,0,0,.6)}
+}
+@media (max-width:640px),(max-height:500px){
+  #top{gap:6px}
+  #top>.bar:nth-child(1){order:1}
+  #top>#chip{order:2;flex:1 1 90px;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-align:center;padding:8px 10px;font-size:14px}
+  #top>.bar:nth-child(2){order:3}
+  #top>.bar:nth-child(4){order:4}
+  #top .grp{gap:4px}
+  #app .bar{padding:5px;border-radius:16px}
+  #app .btn:not(.big){min-width:42px;min-height:42px;padding:0 10px;border-radius:12px}
+  #app .btn svg{width:22px;height:22px}
+  #app .seg{border-radius:12px}
+  #app .seg button{min-height:40px;padding:0 10px;font-size:14px}
+  #bDraw .lbl{display:none}
+  body.drawing #tools{display:grid;grid-template-columns:repeat(2,42px);gap:5px}
+  #tools>div{grid-column:1/-1}
+  #props{padding:6px;gap:8px 12px}
+  #props input[type=range]{width:96px}
+  .sw{width:32px;height:32px}
+  .irow,.irow.hw{grid-template-columns:92px 1fr 52px}
+}
+@media (max-width:899px),(max-height:500px){
+  #bottom{max-height:calc(100vh - var(--th) - 20px);max-height:calc(100dvh - var(--th) - 20px);overflow-y:auto;overscroll-behavior:contain}
+  #bottom .brow{gap:6px 12px;padding:8px 10px;justify-content:space-between}
+  .ctl.tgl{order:0}.ctl.pse{order:1}.ctl.spd{order:2}.ctl.sl{order:3}
+  .ctl.sl{flex:1 1 260px;min-width:0;display:grid;grid-template-columns:44px 1fr 44px;grid-template-areas:"lab lab out" "m r p";gap:2px 6px;align-items:center}
+  .ctl.sl>span{grid-area:lab;font-size:13px}
+  .ctl.sl>output{grid-area:out;text-align:right}
+  .ctl.sl>button:nth-of-type(1){grid-area:m}
+  .ctl.sl>input{grid-area:r;width:100%;min-width:0}
+  .ctl.sl>button:nth-of-type(2){grid-area:p}
+  .ctl.sl .sb{width:44px;height:40px}
+  #sSpeed button{padding:0 9px}
+}
+@media (max-height:700px){
+  #role{gap:10px}
+  #role .brand{font-size:38px}#role .sub{font-size:20px}
+  #role .appicon{width:58px;height:58px;border-radius:18px;margin:2px 0 6px}#role .appicon svg{width:34px;height:34px}
+}
+@media (max-width:420px){.card{padding:18px 14px}.card i{font-size:36px}}
+@media (orientation:landscape) and (max-height:520px){
+  .screen{gap:8px;padding-top:calc(10px + var(--sat));padding-bottom:calc(10px + var(--sab))}
+  .screen h1{font-size:22px}
+  #role .brand{font-size:30px}#role .sub{font-size:17px}
+  #role .appicon{width:46px;height:46px;border-radius:14px;margin:0}#role .appicon svg{width:28px;height:28px}
+  .card{padding:12px;gap:4px;width:min(44vw,250px)}.card i{font-size:28px}
+  .hint{font-size:11px}
+  #sendPrev,#sendRemote,#wizPrev{width:min(300px,44vw,calc((100vh - 150px)*1.6))}
+  #scanVid{width:min(92vw,calc((100vh - 120px)*1.333))}
+  .code{font-size:32px;padding:8px}
+}
+
+/* ---------- LOOP + ξεχωριστό delay ανά κάμερα ---------- */
+.ctl.rst{display:none}
+body[data-mode=loop] .ctl.rst{display:flex}
+body[data-mode=loop] .ctl.cyc{display:none}
+body[data-layout=A] .ctl.dB,body[data-layout=B] .ctl.dA{display:none}
+body[data-mode=loop] #bottom{display:block}
+body[data-mode=loop] #props{bottom:var(--bh)}
+body[data-mode=loop]:not(.noui) #cd[data-pos=bl],body[data-mode=loop]:not(.noui) #cd[data-pos=br]{bottom:var(--bh,104px)}
+@media (max-width:899px),(max-height:500px){.ctl.rst{order:1}}
+@media (max-width:640px),(max-height:500px){#app #segMode button{padding:0 8px;font-size:13px}}
+
+/* ---------- Θέσεις καμερών + zoom ---------- */
+.zctl{position:absolute;z-index:5;top:50%;right:calc(8px + var(--sar));transform:translateY(-50%);display:flex;flex-direction:column;gap:6px;align-items:center;opacity:.72}
+.pane.zoomed .zctl{opacity:1}
+.pane[data-pos=left] .zctl{right:auto;left:calc(8px + var(--sal))}
+.pane:not([data-pos=bottom]) .zctl{top:calc(var(--th) + 6px);transform:none}
+@media (max-width:379px){#top>#chip{display:none}#top{gap:4px}#app #top .btn:not(.big){min-width:38px;padding:0 8px}#app #top .seg button{padding:0 7px}#app #top .bar{padding:4px}}
+.zctl button{width:38px;height:38px;border-radius:50%;border:1px solid rgba(255,255,255,.28);background:rgba(14,16,22,.72);color:#fff;font-size:20px;line-height:1;display:flex;align-items:center;justify-content:center;padding:0;touch-action:manipulation;cursor:pointer}
+.zctl button:active{background:rgba(10,132,255,.8)}
+.zctl .zval{font-size:12px;font-weight:700;background:rgba(0,0,0,.65);padding:2px 7px;border-radius:99px}
+.zctl .zval:empty{display:none}
+body.noui .zctl,body.drawing .zctl{display:none!important}
+#bSwap{display:none}
+body[data-layout=AB] #bSwap{display:inline-flex}
+</style>
+</head>
+<body>
+
+<!-- ============ Επιλογή ρόλου ============ -->
+<div id="role" class="screen">
+  <h1 class="brand">Archery Lab</h1>
+  <h2 class="sub">Video Delay</h2>
+  <div class="appicon"><svg viewBox="0 0 24 24"><rect x="2.5" y="6" width="13" height="12" rx="2.5"/><path d="M15.5 10.5l5-3v9l-5-3z" fill="#111"/><circle cx="9" cy="12" r="3" /><path d="M9 10.4V12l1.2.8"/></svg></div>
+  <p>Επίλεξε τι θα κάνει αυτή η συσκευή</p>
+  <div class="cards">
+    <div class="card" id="goTablet"><i>📺</i><b>Έναρξη</b><span>Πάτα για εκκίνηση: κάμερα, delay playback, σχεδίαση</span></div>
+  </div>
+  <div class="hint">Η κάμερα απαιτεί ασφαλή σύνδεση (https ή localhost). Μετά την πρώτη φόρτωση η εφαρμογή δουλεύει και χωρίς internet.</div>
+</div>
+
+<!-- ============ Εφαρμογή tablet ============ -->
+<div id="app" hidden>
+  <div id="stage">
+    <div id="panes" class="single">
+      <div class="pane" id="paneA"><video class="vl" playsinline muted autoplay></video><video class="va" playsinline muted></video><video class="vb" playsinline muted></video><div class="zctl"><button data-z="+" title="Μεγέθυνση">+</button><button data-z="-" title="Σμίκρυνση">−</button><button data-z="0" title="Επαναφορά zoom">⟲</button><b class="zval"></b></div><div class="tag">📷 Αυτή η συσκευή</div><div class="pmsg"></div></div>
+      <div class="pane off" id="paneB"><video class="vl" playsinline muted autoplay></video><video class="va" playsinline muted></video><video class="vb" playsinline muted></video><div class="zctl"><button data-z="+" title="Μεγέθυνση">+</button><button data-z="-" title="Σμίκρυνση">−</button><button data-z="0" title="Επαναφορά zoom">⟲</button><b class="zval"></b></div><div class="tag">📱 Κινητό</div><div class="pmsg"></div></div>
+    </div>
+    <canvas id="draw"></canvas>
+    <div id="splitter" class="row" hidden><i></i></div>
+  </div>
+
+  <div id="hot"></div>
+  <div id="cd" hidden><svg viewBox="0 0 100 100"><circle class="bg" cx="50" cy="50" r="44"/><circle class="fg" cx="50" cy="50" r="44" transform="rotate(-90 50 50)"/></svg><b></b><small></small></div>
+  <div id="top">
+    <div class="grp bar">
+      <button class="btn" id="bSet" title="Ρυθμίσεις"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg></button>
+      <div class="seg" id="segMode"><button data-m="live" class="on">● LIVE</button><button data-m="delay">⏱ DELAY</button><button data-m="loop">⟲ LOOP</button></div>
+    </div>
+    <div class="grp bar" hidden><div class="seg" id="segLayout"><button data-l="A" class="on" title="Μόνο αυτή η συσκευή">📷</button><button data-l="B" title="Μόνο το κινητό">📱</button><button data-l="AB" title="Δίπλα-δίπλα και οι δύο">📷|📱</button></div><button class="btn" id="bSwap" title="Αντιμετάθεση θέσεων καμερών">⇄</button></div>
+    <div id="chip" class="bar live">LIVE</div>
+    <div class="grp bar">
+      <button class="btn" id="bDraw" title="Σχεδίαση"><svg viewBox="0 0 24 24"><path d="M4 20l3.5-1L19 7.5 16.5 5 5 16.5z"/></svg><span class="lbl"> Σχεδίαση</span></button>
+      <button class="btn" id="bFS" title="Πλήρης οθόνη"><svg viewBox="0 0 24 24"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg></button>
+      <button class="btn" id="uiBtn" title="Απόκρυψη / εμφάνιση μενού"><svg viewBox="0 0 24 24"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7S1 12 1 12z"/><circle cx="12" cy="12" r="3"/></svg></button>
+    </div>
+  </div>
+
+  <div id="tools" class="bar"></div>
+
+  <div id="props" class="bar">
+    <div id="swatches"></div>
+    <input type="color" id="colorPick" value="#ff3b30" title="Άλλο χρώμα">
+    <label>Πάχος <input type="range" id="pW" min="1" max="30" value="5"><output id="oW">5</output></label>
+    <div class="seg" id="pDash"><button data-v="solid" class="on">━━</button><button data-v="dashed">╍╍</button><button data-v="dotted">┅┅</button></div>
+    <button class="btn" id="pFill">Γέμισμα</button>
+    <label>Αδιαφάνεια <input type="range" id="pA" min="10" max="100" value="100"></label>
+  </div>
+
+  <div id="bottom" class="bar">
+    <div class="brow">
+      <div class="ctl keep tgl"><button class="btn" id="bToggle" title="Εμφάνιση / απόκρυψη χρόνων και delay">Χρόνοι ▾</button></div>
+      <div class="ctl sl cyc"><span>Καταγραφή</span><button class="sb" data-k="clip" data-d="-1">−</button><input type="range" id="rClip" min="1" max="60" step="1"><button class="sb" data-k="clip" data-d="1">+</button><output id="oClip"></output></div>
+      <div class="ctl sl"><span>Παίξε τα τελευταία</span><button class="sb" data-k="play" data-d="-1">−</button><input type="range" id="rPlay" min="1" max="60" step="1"><button class="sb" data-k="play" data-d="1">+</button><output id="oPlay"></output></div>
+      <div class="ctl sl dA"><span>📷 Καθυστέρηση</span><button class="sb" data-k="delayA" data-d="-1">−</button><input type="range" id="rDelayA" min="0" max="120" step="1"><button class="sb" data-k="delayA" data-d="1">+</button><output id="oDelayA"></output></div>
+      <div class="ctl sl dB"><span>📱 Καθυστέρηση</span><button class="sb" data-k="delayB" data-d="-1">−</button><input type="range" id="rDelayB" min="0" max="120" step="1"><button class="sb" data-k="delayB" data-d="1">+</button><output id="oDelayB"></output></div>
+      <div class="ctl sl"><span>Επαναλήψεις</span><button class="sb" data-k="reps" data-d="-1">−</button><input type="range" id="rReps" min="1" max="5" step="1"><button class="sb" data-k="reps" data-d="1">+</button><output id="oReps"></output></div>
+      <div class="ctl keep spd"><span>Ταχύτητα</span><div class="seg" id="sSpeed"><button data-v="0.25">¼×</button><button data-v="0.5">½×</button><button data-v="1">1×</button><button data-v="1.5">1.5×</button><button data-v="2">2×</button></div></div>
+      <div class="ctl keep pse"><button class="btn" id="bPause">⏸ Παύση</button></div>
+      <div class="ctl keep rst"><button class="btn" id="bRestart" title="Ξεκίνα τώρα το replay από τα πιο πρόσφατα δευτερόλεπτα">⟲ Τώρα</button></div>
+    </div>
+  </div>
+
+  <div id="settings">
+    <h2>Ρυθμίσεις <button class="btn" id="bSetClose">✕</button></h2>
+
+    <div class="set" hidden>
+      <h3>Προβολή</h3>
+      <div class="seg" id="segLayout2" style="display:none"></div>
+      <div class="row"><span>Δίπλα-δίπλα</span><div class="seg" id="segDir"><button data-d="row" class="on">↔ Δίπλα</button><button data-d="col">↕ Πάνω-κάτω</button></div></div>
+            <div class="row"><span>📷 Θέση κάμερας Α</span><select id="selPosA"><option value="left">Αριστερά</option><option value="right">Δεξιά</option><option value="top">Πάνω</option><option value="bottom">Κάτω</option></select></div>
+      <div class="row"><span>📱 Θέση κάμερας Β</span><select id="selPosB"><option value="left">Αριστερά</option><option value="right">Δεξιά</option><option value="top">Πάνω</option><option value="bottom">Κάτω</option></select></div>
+      <div class="row"><span>Αντιμετάθεση θέσεων</span><button class="btn" id="bSwap2">⇄ Αντιμετάθεση</button></div>
+      <div class="irow"><span>Μέγεθος οθονών</span><input type="range" id="splitRange" min="15" max="85" step="1"><output id="oSplit"></output></div>
+      <div class="row"><button class="btn" id="bSplitReset">↔ 50 / 50</button></div>
+      <div class="note">Στη δίπλα-δίπλα προβολή μπορείς να σύρεις και τη λαβή ανάμεσα στις οθόνες (διπλό πάτημα στη λαβή = 50/50). Τα κουμπιά 📷 / 📱 / 📷|📱 πάνω στην οθόνη διαλέγουν τι βλέπεις. Και οι δύο κάμερες δουλεύουν ταυτόχρονα, η καθεμία με το δικό της delay. Οι «Θέσεις» διαλέγουν ποια κάμερα φαίνεται πού (το «Α» είναι αυτή η συσκευή, το «Β» το κινητό).</div>
+    </div>
+
+    <div class="set">
+      <h3>Μεγέθυνση (zoom)</h3>
+      <div class="irow"><span>📷 Zoom Α</span><input type="range" id="rZoomA" min="1" max="8" step="0.1" value="1"><output id="oZoomA"></output></div>
+      <div class="irow" hidden><span>📱 Zoom Β</span><input type="range" id="rZoomB" min="1" max="8" step="0.1" value="1"><output id="oZoomB"></output></div>
+      <div class="row"><button class="btn" id="bZoomReset">⟲ Επαναφορά zoom</button></div>
+      <div class="note">Στην οθόνη κάθε κάμερας: τσίμπημα με δύο δάχτυλα = zoom, σύρσιμο = μετακίνηση, διπλό πάτημα = zoom / επαναφορά, ή τα κουμπιά + − ⟲ στο πλάι. Ισχύει και στην ζωντανή εικόνα και στο replay. Το οπτικό zoom της κάμερας (αν υπάρχει) είναι πιο κάτω, στις ρυθμίσεις της κάμερας.</div>
+    </div>
+
+    <div class="set">
+      <h3>Κάμερα</h3>
+      <div class="row"><span>Κάμερα</span><select id="selCam"></select></div>
+      <div class="row"><span>Εμπρός / Πίσω</span><button class="btn" id="bFlip">🔄 Αλλαγή</button></div>
+      <div class="row"><span>Ανάλυση</span>
+        <select id="selRes"><option value="480">480p (ελαφρύ)</option><option value="720" selected>720p</option><option value="1080">1080p</option></select></div>
+    </div>
+
+
+    <div class="set" id="imgSet">
+      <h3>Εικόνα</h3>
+      <div class="seg" id="segImgT" hidden><button data-t="AB" class="on">Και οι δύο</button><button data-t="A">📷 Αυτή η συσκευή</button><button data-t="B">📱 Κινητό</button></div>
+      <div id="imgRows"></div>
+      <div class="row"><span>Ασπρόμαυρο</span><button class="btn" id="tBW">Off</button></div>
+      <div class="row"><button class="btn" id="bImgReset">↺ Επαναφορά εικόνας</button></div>
+      <div id="hwBox" hidden><h3 style="margin-top:14px">Κάμερα (hardware)</h3><div id="hwRows"></div></div>
+    </div>
+
+    <div class="set" id="cdSet">
+      <h3>Κύκλος αντίστροφης μέτρησης</h3>
+      <div class="row"><span>Εμφάνιση</span><button class="btn" id="tPhase">On</button></div>
+      <div class="row"><span>Θέση</span><div class="seg" id="segCdPos"><button data-p="tl">↖</button><button data-p="tr">↗</button><button data-p="bl">↙</button><button data-p="br">↘</button></div></div>
+      <div class="irow"><span>Μέγεθος</span><input type="range" id="cdSize" min="60" max="280" step="2"><output id="oCdSize"></output></div>
+      <div class="irow"><span>Πάχος</span><input type="range" id="cdW" min="3" max="20" step="1"><output id="oCdW"></output></div>
+      <div class="irow"><span>Διαφάνεια</span><input type="range" id="cdOp" min="20" max="100" step="5"><output id="oCdOp"></output></div>
+      <div class="row"><span>Ετικέτα φάσης (κείμενο)</span><button class="btn" id="tCdLabel">On</button></div>
+      <div class="colrow">
+        <label>Καταγραφή<input type="color" id="cRec"></label>
+        <label>Αναμονή<input type="color" id="cWait"></label>
+        <label>Αναπαραγωγή<input type="color" id="cPlay"></label>
+      </div>
+      <div class="row"><button class="btn" id="bCdReset">↺ Επαναφορά κύκλου</button></div>
+      <div class="note">Όσο είναι ανοιχτό το μενού, ο κύκλος φαίνεται ως δείγμα ώστε να βλέπεις τις αλλαγές.</div>
+    </div>
+
+    <div class="set">
+      <h3>Εμφάνιση</h3>
+      <div class="row"><span>Καθρέφτης εικόνας</span><button class="btn" id="tMirror">Off</button></div>
+      <div class="row" hidden><span>Καθρέφτης κινητού</span><button class="btn" id="tMirrorB">Off</button></div>
+      <div class="row"><span>Γέμισμα οθόνης (crop)</span><button class="btn" id="tFit">Off</button></div>
+      <div class="row"><span>Μικρό live στη γωνία (στο delay)</span><button class="btn" id="tPip">On</button></div>
+    </div>
+
+    <div class="set">
+      <h3>Πώς δουλεύει το delay</h3>
+      <div class="note">Ο κύκλος επαναλαμβάνεται αυτόματα, χωρίς κουμπιά: <b>1)</b> Καταγραφή για τη διάρκεια που ορίζεις (στην οθόνη φαίνεται η ζωντανή εικόνα). <b>2)</b> Μετά την «Καθυστέρηση» παίζουν τα τελευταία Χ δευτερόλεπτα της καταγραφής, με την ταχύτητα και τις επαναλήψεις που ορίζεις. <b>3)</b> Μόλις τελειώσει η αναπαραγωγή, η οθόνη γυρνά στη ζωντανή εικόνα και ξεκινά νέα καταγραφή. Π.χ. Καταγραφή 10s, Παίξε τα τελευταία 5s. Η αλλαγή «Καταγραφής» ή «Παίξε τα τελευταία» επανεκκινεί τον κύκλο.</div>
+    </div>
+    <div class="set">
+      <h3>Πλήρης οθόνη (PWA)</h3>
+      <div class="row"><span>Πλήρης οθόνη (χωρίς μενού)</span><button class="btn" id="bFS2">⛶ Ενεργοποίηση</button></div>
+      <div class="row"><span>Αυτόματη πλήρης οθόνη στην εκκίνηση</span><button class="btn" id="tAutoFS">On</button></div>
+      <div class="note">Όταν η εφαρμογή εγκατασταθεί στην αρχική οθόνη, ανοίγει σε πλήρη οθόνη από μόνη της (manifest). Σε απλό browser η πλήρης οθόνη ενεργοποιείται με το πάτημα «Έναρξη». Επαναφορά μενού: διπλό πάτημα ή πάνω δεξιά γωνία.</div>
+    </div>
+  </div>
+</div>
+
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs>
+  <filter id="fxA" color-interpolation-filters="sRGB"><feComponentTransfer><feFuncR id="gA_r" type="gamma" exponent="1"/><feFuncG id="gA_g" type="gamma" exponent="1"/><feFuncB id="gA_b" type="gamma" exponent="1"/></feComponentTransfer><feConvolveMatrix id="shA" order="3" kernelMatrix="0 0 0 0 1 0 0 0 0" preserveAlpha="true"/></filter>
+  <filter id="fxB" color-interpolation-filters="sRGB"><feComponentTransfer><feFuncR id="gB_r" type="gamma" exponent="1"/><feFuncG id="gB_g" type="gamma" exponent="1"/><feFuncB id="gB_b" type="gamma" exponent="1"/></feComponentTransfer><feConvolveMatrix id="shB" order="3" kernelMatrix="0 0 0 0 1 0 0 0 0" preserveAlpha="true"/></filter>
+</defs></svg>
+<div id="toast"></div>
+<script>
+'use strict';
+const $=s=>document.querySelector(s), $$=s=>[...document.querySelectorAll(s)];
+const PREFIX='vdelay-';
+const CD_DEF={pos:'tl',size:108,w:9,op:100,label:true,cRec:'#ff3b30',cWait:'#ff9f0a',cPlay:'#0a84ff'};
+const IMG_DEF={b:100,c:100,s:100,h:0,g:1,sh:0,bw:false};
+const S={split:0.5,cd:null,img:null,imgT:'AB',src:'cam',stream:null,mode:'live',clip:10,play:5,delay:2,delayA:2,delayB:2,reps:1,phaseBar:true,speed:1,facing:'environment',deviceId:'',res:720,mirror:false,fit:'contain',pip:true,layout:'A',dir:'row',mirrorB:false,swap:false,zmA:1,zmB:1,pxA:0,pxB:0,pyA:0,pyB:0};
+const SAVE_KEYS=['split','cd','img','clip','play','reps','phaseBar','delay','delayA','delayB','speed','res','mirror','fit','pip','mirrorB','dir','swap','zmA','zmB','pxA','pxB','pyA','pyB'];
+try{const o=JSON.parse(localStorage.getItem('vd_settings')||'{}');SAVE_KEYS.forEach(k=>{if(k in o)S[k]=o[k];});if('delay' in o){if(!('delayA' in o))S.delayA=o.delay;if(!('delayB' in o))S.delayB=o.delay;}}catch(e){}
+S.cd=Object.assign({},CD_DEF,S.cd);
+S.img={A:Object.assign({},IMG_DEF,S.img&&S.img.A),B:Object.assign({},IMG_DEF,S.img&&S.img.B)};
+S.layout='A';S.imgT='A';S.swap=false;
+function save(){try{const o={};SAVE_KEYS.forEach(k=>o[k]=S[k]);localStorage.setItem('vd_settings',JSON.stringify(o));}catch(e){}}
+let toastT;
+function toast(t,ms=3000){const el=$('#toast');el.textContent=t;el.classList.add('show');clearTimeout(toastT);toastT=setTimeout(()=>el.classList.remove('show'),ms);}
+document.addEventListener('gesturestart',e=>e.preventDefault());
+document.addEventListener('contextmenu',e=>e.preventDefault());
+
+/* ---------- Wake lock ---------- */
+let wl=null;
+async function keepAwake(){try{if('wakeLock' in navigator)wl=await navigator.wakeLock.request('screen');}catch(e){}}
+document.addEventListener('visibilitychange',()=>{
+  if(document.visibilityState!=='visible')return;
+  if($('#role').hidden)keepAwake();
+  // Το Android μπορεί να σταματήσει την κάμερα όταν η εφαρμογή πάει στο παρασκήνιο → επανεκκίνηση
+  const dead=st=>!st||!st.getVideoTracks().some(t=>t.readyState==='live');
+  if(!$('#app').hidden&&camStream&&dead(camStream))startCamera();
+});
+
+/* ---------- Βελτιστοποίηση για κινητό (Android) ---------- */
+let TH=80,BCOL=false,backArmed=false,exitT=0;
+try{S.dirAuto=!localStorage.getItem('vd_dirset');}catch(e){S.dirAuto=true;}
+// Αν ο χρήστης δεν έχει επιλέξει ο ίδιος διάταξη: πορτρέτο → πάνω-κάτω, οριζόντιο → δίπλα-δίπλα
+const DIR=()=>S.dirAuto?(window.innerHeight>window.innerWidth?'col':'row'):S.dir;
+function layoutTop(){ // η πάνω μπάρα μπορεί να σπάει σε 2 γραμμές στο κινητό: μετράμε το πραγματικό ύψος
+  const t=$('#top');if(!t)return;
+  const b=t.getBoundingClientRect().bottom;if(!b)return; // κρυμμένο (noui)
+  TH=Math.max(56,Math.round(b)+6);
+  document.documentElement.style.setProperty('--th',TH+'px');
+  if(typeof applyCD==='function'&&$('#cd'))applyCD();
+}
+function updBH(){
+  const b=$('#bottom');if(!b||!b.offsetHeight)return;
+  const st=$('#stage').getBoundingClientRect();
+  document.documentElement.style.setProperty('--bh',Math.round(st.bottom-b.getBoundingClientRect().top+10)+'px');
+}
+function setBcol(v,persist){
+  BCOL=!!v;document.body.classList.toggle('bcol',BCOL);
+  const b=$('#bToggle');if(b)b.textContent=BCOL?'Χρόνοι ▴':'Χρόνοι ▾';
+  if(persist){try{localStorage.setItem('vd_bcol',BCOL?'1':'0');}catch(e){}}
+  setTimeout(updBH,30);
+}
+function initMobile(){
+  const small=window.matchMedia('(max-width:899px),(max-height:500px)').matches;
+  let sv=null;try{sv=localStorage.getItem('vd_bcol');}catch(e){}
+  setBcol(sv===null?small:sv==='1');
+  $('#bToggle').onclick=()=>setBcol(!BCOL,true);
+  if(window.ResizeObserver){new ResizeObserver(layoutTop).observe($('#top'));new ResizeObserver(updBH).observe($('#bottom'));}
+  let rz;window.addEventListener('resize',()=>{clearTimeout(rz);rz=setTimeout(()=>{if(S.dirAuto)applyView();layoutTop();updBH();},150);});
+  layoutTop();
+}
+/* Κουμπί «Πίσω» του Android: κλείνει πρώτα μενού/παράθυρα, και μετά ζητά επιβεβαίωση για έξοδο */
+function armBack(){if(backArmed)return;backArmed=true;try{history.pushState({vd:1},'');}catch(e){}}
+function closeTop(){
+  if($('#settings').classList.contains('open')){$('#settings').classList.remove('open');return true;}
+  if(document.body.classList.contains('noui')){
+    if(isFS()){try{(document.exitFullscreen||document.webkitExitFullscreen).call(document);}catch(e){}}
+    fsHid=false;setUI(false);return true;
+  }
+  if(document.body.classList.contains('drawing')){$('#bDraw').click();return true;}
+  return false;
+}
+window.addEventListener('popstate',()=>{
+  if(!backArmed)return;
+  const keep=()=>{try{history.pushState({vd:1},'');}catch(e){}};
+  if(closeTop()){keep();return;}
+  const now=Date.now();
+  if(now-exitT<2500){backArmed=false;history.back();return;}
+  exitT=now;toast('Πάτα ξανά «Πίσω» για έξοδο',2200);keep();
+});
+function goRole(){
+  if(backArmed){backArmed=false;try{history.back();}catch(e){}}
+  setTimeout(()=>{location.hash='';location.reload();},120);
+}
+
+/* ---------- Επιλογή ρόλου ---------- */
+$('#goTablet').onclick=()=>{if(autoFS())reqFS();enterTablet();};
+
+/* =====================================================================
+   TABLET  (δύο κανάλια: A = κάμερα συσκευής, B = κάμερα κινητού)
+   ===================================================================== */
+const stage=$('#stage');
+let camStream=null;
+const MIME=(()=>{if(!window.MediaRecorder)return '';
+  for(const m of ['video/webm;codecs=vp8','video/webm','video/mp4;codecs=avc1','video/mp4']){try{if(MediaRecorder.isTypeSupported(m))return m;}catch(e){}}return '';})();
+
+const CH={};
+function makeCh(key){
+  const pane=$('#pane'+key);
+  return {key,pane,vl:pane.querySelector('.vl'),vA:pane.querySelector('.va'),msgEl:pane.querySelector('.pmsg'),stream:null,rec:null,clip:null,recDone:false};
+}
+const chans=()=>[CH.A,CH.B];
+const has=c=>!!(c.stream&&c.stream.active!==false&&c.stream.getVideoTracks().some(t=>t.readyState==='live'));
+const visible=c=>S.layout==='AB'||S.layout===c.key;
+const visChs=()=>chans().filter(visible);
+
+async function enterTablet(){
+  $('#role').hidden=true;$('#app').hidden=false;keepAwake();
+  CH.A=makeCh('A');CH.B=makeCh('B');
+  armBack();initUI();initMobile();applyView();resizeCanvas();setInterval(tick,250);requestAnimationFrame(progLoop);
+  await startCamera();
+}
+
+/* ---------- Κάμερα συσκευής ---------- */
+async function startCamera(){
+  if(!navigator.mediaDevices||!navigator.mediaDevices.getUserMedia){toast('Η κάμερα δεν είναι διαθέσιμη (χρειάζεται https).',6000);return;}
+  if(camStream){camStream.getTracks().forEach(t=>t.stop());camStream=null;}
+  const dims={480:[854,480],720:[1280,720],1080:[1920,1080]}[S.res]||[1280,720];
+  const v={width:{ideal:dims[0]},height:{ideal:dims[1]},frameRate:{ideal:30}};
+  if(S.deviceId)v.deviceId={exact:S.deviceId};else v.facingMode={ideal:S.facing};
+  try{
+    camStream=await navigator.mediaDevices.getUserMedia({audio:false,video:v});
+  }catch(e){
+    toast('Δεν δόθηκε πρόσβαση στην κάμερα: '+(e.name||e.message),6000);
+    setChStream(CH.A,null);return;
+  }
+  setChStream(CH.A,camStream);
+  listCameras();
+  hwSetup();
+}
+async function listCameras(){
+  try{
+    const d=(await navigator.mediaDevices.enumerateDevices()).filter(x=>x.kind==='videoinput');
+    const sel=$('#selCam');sel.innerHTML='';
+    d.forEach((x,i)=>{const o=document.createElement('option');o.value=x.deviceId;o.textContent=x.label||('Κάμερα '+(i+1));sel.appendChild(o);});
+    const cur=camStream&&camStream.getVideoTracks()[0];
+    if(cur){const id=cur.getSettings().deviceId;if(id)sel.value=id;}
+  }catch(e){}
+}
+function setChStream(c,st){
+  c.stream=st||null;c.vl.srcObject=st||null;
+  if(st)c.vl.play().catch(()=>{});
+  if(S.mode==='delay')cycleStart();else if(S.mode==='loop')loopStart();
+  applyView();
+}
+
+/* ---------- Λειτουργίες LIVE / DELAY και διάταξη ---------- */
+let barHinted=false;
+function setMode(m){
+  if(m==='delay'&&!window.MediaRecorder){toast('Ο browser δεν υποστηρίζει καταγραφή (MediaRecorder).',5000);return;}
+  if(m==='loop'&&!RB_OK()){toast('Το LOOP χρειάζεται Chrome με υποστήριξη MediaSource (WebM).',5000);return;}
+  S.mode=m;
+  $$('#segMode button').forEach(b=>b.classList.toggle('on',b.dataset.m===m));
+  if(m!=='loop')loopStop();
+  if(m==='delay')cycleStart();
+  else if(m==='loop'){cyClear();loopStart();toast('LOOP: συνεχές replay των τελευταίων '+S.play+' s',2500);}
+  else{cyClear();syncVideos();}
+  applyView();
+  if((m==='delay'||m==='loop')&&BCOL&&!barHinted){barHinted=true;setTimeout(()=>toast('Πάτα «Χρόνοι ▴» κάτω αριστερά για τα sliders (καθυστέρηση κάθε κάμερας, χρόνοι)',5000),2800);}
+}
+function setLayout(l){
+  S.layout=l;applyView();
+  if(S.mode==='delay')cycleStart();else if(S.mode==='loop')loopStart();
+}
+const clampSplit=v=>Math.min(0.85,Math.max(0.15,v));
+function applySplit(){
+  const dual=S.layout==='AB',r=clampSplit(S.split),sp=$('#splitter'),col=DIR()==='col';
+  const first=S.swap?CH.B:CH.A,second=S.swap?CH.A:CH.B; // η «πρώτη» (αριστερά/πάνω) θέση παίρνει το r
+  first.pane.style.flex=dual?`${r} 1 0`:'1 1 0';second.pane.style.flex=dual?`${1-r} 1 0`:'1 1 0';
+  sp.hidden=!dual;sp.classList.toggle('col',col);sp.classList.toggle('row',!col);
+  sp.style.left=col?'0':(r*100)+'%';sp.style.top=col?(r*100)+'%':'0';
+  if(!col)sp.style.removeProperty('right');
+  const rg=$('#splitRange');if(rg){rg.value=Math.round(r*100);$('#oSplit').textContent=Math.round(r*100)+' / '+Math.round((1-r)*100);}
+}
+function initSplit(){
+  const sp=$('#splitter');let drag=false,lastTap=0;
+  sp.addEventListener('pointerdown',e=>{
+    e.preventDefault();e.stopPropagation();sp.setPointerCapture(e.pointerId);drag=true;sp.classList.add('drag');
+    const now=Date.now();if(now-lastTap<350){S.split=0.5;applySplit();save();}lastTap=now;
+  });
+  sp.addEventListener('pointermove',e=>{
+    if(!drag)return;e.preventDefault();
+    const r=stage.getBoundingClientRect();
+    let v=DIR()==='col'?(e.clientY-r.top)/r.height:(e.clientX-r.left)/r.width;
+    v=clampSplit(v);if(Math.abs(v-0.5)<0.02)v=0.5;
+    S.split=v;applySplit();
+  });
+  const end=()=>{if(!drag)return;drag=false;sp.classList.remove('drag');save();};
+  sp.addEventListener('pointerup',end);sp.addEventListener('pointercancel',end);
+  $('#splitRange').oninput=e=>{S.split=clampSplit(+e.target.value/100);applySplit();save();};
+  $('#bSplitReset').onclick=()=>{S.split=0.5;applySplit();save();};
+}
+function applyView(){
+  const dual=S.layout==='AB';
+  document.body.dataset.mode=S.mode;document.body.dataset.layout=S.layout;
+  document.body.classList.toggle('mirror',S.mirror);
+  document.body.classList.toggle('mirrorB',S.mirrorB);
+  stage.style.setProperty('--fit',S.fit);
+  $('#panes').className=(dual?'dual':'single')+(DIR()==='col'?' col':'');
+  applyPanes();applySplit();applyZoom();
+  CH.A.pane.classList.toggle('off',!visible(CH.A));CH.B.pane.classList.toggle('off',!visible(CH.B));
+  syncVideos();
+  const tg=(id,on,t1,t0)=>{const b=$(id);b.textContent=on?(t1||'On'):(t0||'Off');b.classList.toggle('on',on);};
+  tg('#tMirror',S.mirror);tg('#tMirrorB',S.mirrorB);tg('#tFit',S.fit==='cover');tg('#tPip',S.pip);tg('#tPhase',S.phaseBar);
+  $$('[data-l]').forEach(b=>b.classList.toggle('on',b.dataset.l===S.layout));
+  $$('#segDir button').forEach(b=>b.classList.toggle('on',b.dataset.d===DIR()));
+  setTimeout(updBH,50);
+}
+
+/* ---------- Θέσεις καμερών (αριστερά / δεξιά / πάνω / κάτω) + zoom ---------- */
+const ZMAX=8;
+const isFirst=k=>k==='A'?!S.swap:S.swap;
+const posOf=k=>{const f=isFirst(k);return DIR()==='col'?(f?'top':'bottom'):(f?'left':'right');};
+function setPos(k,pos){ // η κάμερα k πάει στη θέση pos· η άλλη παίρνει την αντίθετη
+  const col=pos==='top'||pos==='bottom',first=pos==='left'||pos==='top';
+  S.swap=k==='A'?!first:first;
+  S.dir=col?'col':'row';S.dirAuto=false;try{localStorage.setItem('vd_dirset','1');}catch(e){}
+  save();applyView();
+}
+function applyPanes(){
+  const dual=S.layout==='AB';
+  CH.A.pane.style.order=S.swap?2:1;CH.B.pane.style.order=S.swap?1:2;
+  for(const c of chans())c.pane.dataset.pos=dual?posOf(c.key):'full';
+  const a=$('#selPosA'),b=$('#selPosB');if(a)a.value=posOf('A');if(b)b.value=posOf('B');
+}
+function applyZoom(){
+  for(const c of chans()){
+    const k=c.key;let z=Math.min(ZMAX,Math.max(1,+S['zm'+k]||1));if(z<1.001)z=1;
+    const m=(z-1)/2;
+    S['zm'+k]=z;S['px'+k]=Math.max(-m,Math.min(m,+S['px'+k]||0));S['py'+k]=Math.max(-m,Math.min(m,+S['py'+k]||0));
+    const st=c.pane.style;
+    st.setProperty('--zm',z);st.setProperty('--zx',(S['px'+k]*100).toFixed(2)+'%');st.setProperty('--zy',(S['py'+k]*100).toFixed(2)+'%');
+    const zv=c.pane.querySelector('.zval');if(zv)zv.textContent=z>1?('×'+z.toFixed(1)):'';
+    c.pane.classList.toggle('zoomed',z>1);
+    const r=$('#rZoom'+k),o=$('#oZoom'+k);if(r&&document.activeElement!==r)r.value=z;if(o)o.textContent=z.toFixed(1)+'×';
+  }
+}
+function zoomAt(c,nz,cx,cy){ // zoom γύρω από το σημείο (cx,cy) της οθόνης, ώστε να μένει κάτω από τα δάχτυλα
+  const r=c.pane.getBoundingClientRect(),k=c.key;if(!r.width)return;
+  const z=+S['zm'+k]||1;nz=Math.min(ZMAX,Math.max(1,nz));
+  const px=cx-(r.left+r.width/2),py=cy-(r.top+r.height/2),tx=(+S['px'+k]||0)*r.width,ty=(+S['py'+k]||0)*r.height;
+  S['zm'+k]=nz;S['px'+k]=(px-(nz/z)*(px-tx))/r.width;S['py'+k]=(py-(nz/z)*(py-ty))/r.height;
+  applyZoom();
+}
+function zoomCenter(c,nz){const r=c.pane.getBoundingClientRect();zoomAt(c,nz,r.left+r.width/2,r.top+r.height/2);}
+function zoomReset(c,quiet){const k=c.key;S['zm'+k]=1;S['px'+k]=0;S['py'+k]=0;applyZoom();if(!quiet)save();}
+function initZoom(){
+  for(const c of chans()){
+    const pane=c.pane,k=c.key,ptrs=new Map();
+    let g=null,tap=null,lastTap=null;
+    const mid=()=>{const a=[...ptrs.values()];return {x:(a[0].x+a[1].x)/2,y:(a[0].y+a[1].y)/2,d:Math.hypot(a[0].x-a[1].x,a[0].y-a[1].y)};};
+    const begin=()=>{
+      const r=pane.getBoundingClientRect();
+      if(ptrs.size>=2){const m=mid();g={m:'pinch',z0:+S['zm'+k]||1,tx0:(+S['px'+k]||0)*r.width,ty0:(+S['py'+k]||0)*r.height,d0:Math.max(10,m.d),cx0:m.x-(r.left+r.width/2),cy0:m.y-(r.top+r.height/2)};}
+      else if(ptrs.size===1){const p=[...ptrs.values()][0];g={m:'pan',x0:p.x,y0:p.y,px0:+S['px'+k]||0,py0:+S['py'+k]||0};}
+      else g=null;
+    };
+    pane.addEventListener('pointerdown',e=>{
+      if(e.target.closest&&e.target.closest('.zctl'))return;
+      ptrs.set(e.pointerId,{x:e.clientX,y:e.clientY});
+      try{pane.setPointerCapture(e.pointerId);}catch(err){}
+      if(ptrs.size===1)tap={t:Date.now(),x:e.clientX,y:e.clientY,moved:false};else if(tap)tap.moved=true;
+      begin();
+    });
+    pane.addEventListener('pointermove',e=>{
+      if(!ptrs.has(e.pointerId))return;
+      ptrs.set(e.pointerId,{x:e.clientX,y:e.clientY});
+      if(tap&&Math.hypot(e.clientX-tap.x,e.clientY-tap.y)>10)tap.moved=true;
+      if(!g)return;
+      const r=pane.getBoundingClientRect();if(!r.width)return;
+      if(g.m==='pinch'&&ptrs.size>=2){
+        const m=mid(),nz=Math.min(ZMAX,Math.max(1,g.z0*m.d/g.d0));
+        const px=m.x-(r.left+r.width/2),py=m.y-(r.top+r.height/2);
+        const qx=(g.cx0-g.tx0)/g.z0,qy=(g.cy0-g.ty0)/g.z0;       // σημείο του περιεχομένου κάτω από τα δάχτυλα στην αρχή
+        S['zm'+k]=nz;S['px'+k]=(px-nz*qx)/r.width;S['py'+k]=(py-nz*qy)/r.height;applyZoom();
+      }else if(g.m==='pan'&&(+S['zm'+k]||1)>1.001){
+        S['px'+k]=g.px0+(e.clientX-g.x0)/r.width;S['py'+k]=g.py0+(e.clientY-g.y0)/r.height;applyZoom();
+      }
+    });
+    const up=e=>{
+      if(!ptrs.has(e.pointerId))return;
+      ptrs.delete(e.pointerId);
+      if(ptrs.size===0&&tap&&!tap.moved&&e.type==='pointerup'&&Date.now()-tap.t<300&&!document.body.classList.contains('noui')){
+        const n=Date.now();
+        if(lastTap&&n-lastTap.t<320&&Math.hypot(lastTap.x-tap.x,lastTap.y-tap.y)<40){
+          lastTap=null;
+          if((+S['zm'+k]||1)>1.001)zoomReset(c,true);else zoomAt(c,2.5,tap.x,tap.y);
+        }else lastTap={t:n,x:tap.x,y:tap.y};
+      }
+      begin();
+      if(ptrs.size===0){tap=null;save();}
+    };
+    pane.addEventListener('pointerup',up);pane.addEventListener('pointercancel',up);
+    pane.addEventListener('wheel',e=>{e.preventDefault();zoomAt(c,(+S['zm'+k]||1)*Math.exp(-e.deltaY*0.002),e.clientX,e.clientY);save();},{passive:false});
+    pane.querySelectorAll('.zctl button').forEach(b=>b.addEventListener('click',()=>{
+      const z=+S['zm'+k]||1,d=b.dataset.z;
+      if(d==='0')zoomReset(c,true);else zoomCenter(c,d==='+'?z*1.25:z/1.25);
+      save();
+    }));
+  }
+}
+
+/* ---------- Μηχανή κύκλου: ΚΑΤΑΓΡΑΦΗ → (ΚΑΘΥΣΤΕΡΗΣΗ) → ΑΝΑΠΑΡΑΓΩΓΗ → ξανά ΚΑΤΑΓΡΑΦΗ ---------- */
+const CY={phase:'idle',t0:0,dur:0,gen:0,timers:[],paused:false,act:[],pl:[]};
+const after=(ms,fn)=>{CY.timers.push(setTimeout(fn,Math.max(0,ms)));};
+function revoke(it){if(it&&it.url&&!it.dead){URL.revokeObjectURL(it.url);it.dead=true;}}
+function cyClear(){
+  CY.gen++;CY.timers.forEach(clearTimeout);CY.timers=[];CY.phase='idle';CY.act=[];CY.pl=[];CY.paused=false;
+  for(const c of chans()){
+    c.ph='';c.rep=0;c.rid=(c.rid||0)+1;
+    if(c.rec){try{if(c.rec.state!=='inactive')c.rec.stop();}catch(e){}c.rec=null;}
+    revoke(c.clip);c.clip=null;c.recDone=false;
+    const v=c.vA;v.onended=null;v.pause();v.removeAttribute('src');try{v.load();}catch(e){}
+  }
+  $('#bPause').textContent='⏸ Παύση';
+}
+function syncVideos(){
+  const dly=S.mode==='delay'||S.mode==='loop';
+  for(const c of chans()){
+    const playing=dly&&visible(c)&&(S.mode==='loop'?!!(c.rb&&c.rb.showing):(CY.phase==='play'&&c.ph!=='wait'&&c.clip&&!c.clip.dead));
+    c.vl.className=!dly?'vl on':(playing?(S.pip&&has(c)?'vl pip':'vl'):'vl on');
+    c.vA.classList.toggle('on',!!playing);
+  }
+}
+function cycleStart(){
+  cyClear();
+  if(S.mode!=='delay'){syncVideos();return;}
+  const act=visChs().filter(has);
+  if(!act.length){syncVideos();return;}
+  const gen=CY.gen,R=S.clip,P=Math.min(S.play,R);
+  CY.act=act;CY.phase='rec';CY.t0=performance.now();CY.dur=R*1000;
+  syncVideos();
+  // καταγράφονται μόνο τα τελευταία P δευτερόλεπτα της διάρκειας R (χωρίς seek σε blob)
+  after((R-P)*1000,()=>{
+    if(gen!==CY.gen)return;
+    for(const c of act){
+      c.recDone=false;
+      try{c.rec=newRec(c,gen);c.rec.start();}catch(e){c.rec=null;c.recDone=true;}
+    }
+  });
+  after(R*1000,()=>{
+    if(gen!==CY.gen)return;
+    let any=false;
+    for(const c of act){if(c.rec&&c.rec.state==='recording'){any=true;try{c.rec.stop();}catch(e){c.recDone=true;}}else c.recDone=true;}
+    if(!any)recCheck(gen);
+    after(2500,()=>{if(gen===CY.gen&&CY.phase==='rec')toWait(gen);}); // ασφάλεια
+  });
+}
+function newRec(c,gen){
+  const opts={videoBitsPerSecond:S.res>=1080?8e6:S.res>=720?5e6:2.5e6};
+  if(MIME)opts.mimeType=MIME;
+  let rec;
+  try{rec=new MediaRecorder(c.stream,opts);}catch(e){rec=new MediaRecorder(c.stream);}
+  const chunks=[];let t0=performance.now();
+  rec.ondataavailable=e=>{if(e.data&&e.data.size)chunks.push(e.data);};
+  rec.addEventListener('start',()=>{t0=performance.now();});
+  rec.onstop=()=>{
+    if(gen!==CY.gen)return;
+    const dur=(performance.now()-t0)/1000;
+    if(chunks.length)c.clip={url:URL.createObjectURL(new Blob(chunks,{type:rec.mimeType||MIME||'video/webm'})),dur,dead:false};
+    c.recDone=true;recCheck(gen);
+  };
+  return rec;
+}
+function recCheck(gen){
+  if(gen!==CY.gen||CY.phase!=='rec')return;
+  if(CY.act.every(c=>c.recDone))toWait(gen);
+}
+function toWait(gen){
+  if(gen!==CY.gen||CY.phase!=='rec')return;
+  const pl=CY.act.filter(c=>c.clip&&!c.clip.dead);
+  if(!pl.length){cycleStart();return;}
+  const now=performance.now();
+  CY.phase='wait';CY.t0=now;CY.dur=Math.min(...pl.map(chDelay))*1000;CY.pl=pl;
+  syncVideos();
+  // κάθε κάμερα ξεκινά την αναπαραγωγή με τη δική της καθυστέρηση
+  for(const c of pl){
+    c.ph='wait';c.rep=0;const ms=chDelay(c)*1000;c.tstart=now+ms;
+    c.tm=setTimeout(()=>chPlay(gen,c),ms);CY.timers.push(c.tm);
+  }
+}
+async function chPlay(gen,c){
+  if(gen!==CY.gen)return;
+  const rid=c.rid=(c.rid||0)+1,v=c.vA;
+  v.onended=null;
+  if(c.rep===0||!v.src)v.src=c.clip.url;
+  v.defaultPlaybackRate=S.speed;v.playbackRate=S.speed;
+  try{v.currentTime=0;}catch(e){}
+  try{
+    await v.play();v.playbackRate=S.speed;
+    if(v.requestVideoFrameCallback)await new Promise(r=>{v.requestVideoFrameCallback(()=>r());setTimeout(r,300);});
+  }catch(e){if(gen===CY.gen&&c.rid===rid)chDone(gen,c);return;}
+  if(gen!==CY.gen||c.rid!==rid)return;
+  c.ph='play';
+  if(CY.paused)v.pause();
+  if(CY.phase!=='play'){CY.phase='play';CY.t0=performance.now();}
+  syncVideos();
+  v.onended=()=>{
+    if(gen!==CY.gen||CY.paused||c.rid!==rid)return;
+    c.rep++;
+    if(c.rep<S.reps)chPlay(gen,c);else chDone(gen,c);
+  };
+  after(c.clip.dur*1000/S.speed+3000,()=>{if(gen===CY.gen&&c.ph==='play'&&c.rid===rid&&!CY.paused&&v.onended)v.onended();}); // ασφάλεια
+}
+function chDone(gen,c){
+  if(gen!==CY.gen)return;
+  c.ph='done';c.vA.onended=null;
+  if(CY.pl.every(x=>x.ph==='done'))cycleStart();
+}
+function togglePause(){
+  if(S.mode==='loop'){
+    LP.paused=!LP.paused;
+    for(const c of chans())if(c.rb&&c.rb.showing){if(LP.paused)c.vA.pause();else c.vA.play().catch(()=>{});}
+    $('#bPause').textContent=LP.paused?'▶ Συνέχεια':'⏸ Παύση';
+    return;
+  }
+  if(S.mode!=='delay')return;
+  const gen=CY.gen;
+  if(!CY.paused){
+    if(CY.phase==='play'){
+      CY.paused=true;
+      for(const c of CY.pl){
+        if(c.ph==='play')c.vA.pause();
+        else if(c.ph==='wait'){clearTimeout(c.tm);c.left=Math.max(0,c.tstart-performance.now());}
+      }
+    }else{cyClear();CY.paused=true;syncVideos();}
+    $('#bPause').textContent='▶ Συνέχεια';
+  }else{
+    if(CY.phase==='play'){
+      CY.paused=false;const now=performance.now();
+      for(const c of CY.pl){
+        if(c.ph==='play')c.vA.play().catch(()=>{});
+        else if(c.ph==='wait'){c.tstart=now+c.left;c.tm=setTimeout(()=>chPlay(gen,c),c.left);CY.timers.push(c.tm);}
+      }
+      $('#bPause').textContent='⏸ Παύση';
+    }else{cycleStart();}
+  }
+}
+function setSpeed(x){
+  S.speed=x;save();
+  $$('#sSpeed button').forEach(b=>b.classList.toggle('on',+b.dataset.v===x));
+  for(const c of chans()){c.vA.defaultPlaybackRate=x;c.vA.playbackRate=x;}
+}
+
+/* ---------- LOOP: συνεχές replay των τελευταίων Ν δευτερολέπτων ----------
+   Κάθε κάμερα καταγράφει συνεχώς σε κυλιόμενο buffer (MediaRecorder → MediaSource). Το replay παίζει το παράθυρο
+   [τώρα − delay − Ν , τώρα − delay] και στο τέλος κάθε περάσματος «αγκυροβολεί» ξανά στο πιο πρόσφατο σημείο. */
+const LP={paused:false,iv:0,fails:0};
+const RB_OK=()=>!!(window.MediaSource&&window.MediaRecorder&&MIME&&/webm/.test(MIME)&&MediaSource.isTypeSupported(MIME));
+const chDelay=c=>c.key==='A'?S.delayA:S.delayB;
+const rbBitrate=()=>S.res>=1080?6e6:S.res>=720?3e6:1.5e6;
+function rbCreate(c){
+  const rb={c,stream:c.stream,q:[],chain:Promise.resolve(),dead:false,sb:null,rec:null,pass:null,showing:false,iv:0};
+  c.rb=rb;
+  const ms=new MediaSource();rb.ms=ms;rb.url=URL.createObjectURL(ms);
+  const v=c.vA;v.onended=null;v.src=rb.url;
+  ms.addEventListener('sourceopen',()=>{
+    if(rb.dead||rb.sb)return;
+    try{
+      rb.sb=ms.addSourceBuffer(MIME);rb.sb.mode='sequence';
+      rb.sb.addEventListener('updateend',()=>rbPump(rb));
+      rb.sb.addEventListener('error',()=>rbFail(rb));
+      rb.rec=new MediaRecorder(c.stream,{mimeType:MIME,videoBitsPerSecond:rbBitrate(),videoKeyFrameIntervalDuration:1000});
+      rb.rec.ondataavailable=e=>{
+        if(!e.data||!e.data.size)return;
+        rb.chain=rb.chain.then(()=>e.data.arrayBuffer()).then(buf=>{if(!rb.dead){rb.q.push(buf);rbPump(rb);}}).catch(()=>{});
+      };
+      rb.rec.onerror=()=>rbFail(rb);
+      rb.rec.start(200);
+      rb.iv=setInterval(()=>{rbTrim(rb,false);rbPump(rb);},1000);
+    }catch(e){rbFail(rb);}
+  });
+  v.onerror=()=>rbFail(rb);
+}
+function rbDispose(c){
+  const rb=c.rb;if(!rb)return;
+  rb.dead=true;clearInterval(rb.iv);
+  try{if(rb.rec&&rb.rec.state!=='inactive')rb.rec.stop();}catch(e){}
+  const v=c.vA;v.onerror=null;
+  try{v.pause();v.removeAttribute('src');v.load();}catch(e){}
+  try{URL.revokeObjectURL(rb.url);}catch(e){}
+  c.rb=null;
+}
+function rbFail(rb){
+  if(rb.dead)return;
+  rbDispose(rb.c);
+  if(S.mode!=='loop')return;
+  if(++LP.fails>5){toast('Σφάλμα στο LOOP — επιστροφή σε LIVE',5000);setMode('live');return;}
+  setTimeout(()=>{if(S.mode==='loop')loopStart();},600);
+}
+function rbPump(rb){
+  const sb=rb.sb;if(rb.dead||!sb||sb.updating||!rb.q.length)return;
+  const buf=rb.q.shift();
+  try{sb.appendBuffer(buf);}
+  catch(e){
+    if(e&&e.name==='QuotaExceededError'){rb.q.unshift(buf);if(!rbTrim(rb,true))rb.q.shift();}
+    else rbFail(rb);
+  }
+}
+function rbTrim(rb,force){ // κρατά μόνο όσο buffer χρειάζεται (Ν + delay + περιθώριο) ώστε να μη γεμίζει η μνήμη
+  const sb=rb.sb;if(rb.dead||!sb||sb.updating||!sb.buffered.length)return false;
+  const b=sb.buffered,st=b.start(0),en=b.end(b.length-1);
+  const keep=force?Math.max(6,(en-st)/2):Math.min(150,S.play+Math.max(S.delayA,S.delayB)+8);
+  if(!force&&en-st<keep+3)return false;       // μικρή υστέρηση: καθάρισε σπάνια και σε μεγαλύτερα κομμάτια
+  let cut=en-keep;
+  const v=rb.c.vA;
+  if(rb.showing){ // μην σβήσεις το σημείο που παίζει ούτε την αρχή του τρέχοντος παραθύρου (για τις επαναλήψεις)· το MSE κόβει μέχρι το επόμενο keyframe (~5s)
+    const g=Math.min(v.currentTime,rb.pass?rb.pass.s:Infinity);
+    if(!(LP.paused&&en-g>180))cut=Math.min(cut,g-8);
+  }
+  if(cut-st<1)return false;
+  try{sb.remove(st,cut);return true;}catch(e){return false;}
+}
+function rbPass(c,force){
+  const rb=c.rb,sb=rb&&rb.sb;if(!sb||rb.dead)return;
+  const b=sb.buffered;if(!b.length)return;
+  const bs=b.start(b.length-1),be=b.end(b.length-1),d=chDelay(c),N=Math.max(1,S.play);
+  if(be-bs<d+0.8)return;                       // ο buffer ακόμη γεμίζει
+  const e=be-d,s=Math.max(bs,e-N),v=c.vA;
+  // αν το νέο παράθυρο ξεκινά εκεί που βρισκόμαστε ήδη (ταχύτητα 1×), συνεχίζουμε χωρίς seek → ομαλή ροή
+  const smooth=S.speed===1&&S.reps===1;     // συνεχής ροή: για μικρές αποκλίσεις (<1s) δεν κάνουμε seek, διορθώνουμε με ελαφριά αλλαγή ταχύτητας
+  const cont=!force&&!!rb.pass&&!v.paused&&!v.seeking&&v.currentTime>=bs&&Math.abs(v.currentTime-s)<(smooth?1:0.3);
+  rb.pass={s:cont?v.currentTime:s,e,rep:0};
+  let rate=S.speed;
+  if(cont&&smooth){const corr=s-v.currentTime;if(Math.abs(corr)>0.15)rate=S.speed*(1+Math.max(-0.05,Math.min(0.05,corr*0.1)));}
+  v.defaultPlaybackRate=S.speed;v.playbackRate=rate;
+  if(!cont){try{v.currentTime=s;}catch(err){}}
+  v.play().catch(()=>{});
+  LP.fails=0;
+  if(!rb.showing){rb.showing=true;syncVideos();}
+}
+function loopTick(){
+  if(S.mode!=='loop'||LP.paused)return;
+  for(const c of chans()){
+    const rb=c.rb;if(!rb||!rb.sb||rb.dead)continue;
+    const v=c.vA,p=rb.pass,nw=performance.now();
+    if(!p){rbPass(c);continue;}
+    if(!rb.wd||v.paused||Math.abs(v.currentTime-rb.wd.ct)>0.02)rb.wd={ct:v.currentTime,t:nw};
+    else if(nw-rb.wd.t>(v.seeking?3000:1500)){rb.wd=null;rbPass(c,true);continue;} // κόλλησε (ή seek που δεν τελειώνει) → ξαναπιάσε το πιο πρόσφατο παράθυρο
+    if(v.currentTime>=p.e-0.05||v.ended){
+      const bb=rb.sb.buffered,bs0=bb.length?bb.start(bb.length-1):0;
+      if(++p.rep<S.reps&&p.s>=bs0){try{v.currentTime=p.s;}catch(e){}v.play().catch(()=>{});}
+      else rbPass(c);
+    }else if(v.paused&&!v.seeking)v.play().catch(()=>{});
+  }
+}
+function loopStart(){
+  LP.paused=false;$('#bPause').textContent='⏸ Παύση';
+  for(const c of chans()){
+    const want=visible(c)&&has(c);
+    if(c.rb&&(!want||c.rb.stream!==c.stream))rbDispose(c);
+    if(want&&!c.rb)rbCreate(c);
+  }
+  syncVideos();
+  if(!LP.iv)LP.iv=setInterval(loopTick,50);
+}
+function loopStop(){
+  for(const c of chans())rbDispose(c);
+  clearInterval(LP.iv);LP.iv=0;
+}
+function loopRestart(){
+  if(S.mode!=='loop')return;
+  LP.paused=false;$('#bPause').textContent='⏸ Παύση';
+  for(const c of chans())if(c.rb&&c.rb.sb)rbPass(c,true);
+}
+
+/* ---------- Κατάσταση / μηνύματα ---------- */
+function phaseInfo(now){
+  const prim=visChs().find(has)||visChs()[0];
+  const idle={name:'idle',frac:0,rem:0,label:''};
+  if(!prim||!has(prim)||(S.mode!=='delay'&&S.mode!=='loop'))return idle;
+  if(S.mode==='loop'){
+    const rb=prim.rb;if(!rb)return idle;
+    if(LP.paused)return {name:'pause',frac:0,rem:0,label:'⏸ Παύση'};
+    const p=rb.pass,d=chDelay(prim);
+    if(!p){
+      const bb=rb.sb&&rb.sb.buffered,have=bb&&bb.length?bb.end(bb.length-1)-bb.start(bb.length-1):0,need=d+0.8;
+      return {name:'wait',frac:Math.min(1,have/need),rem:Math.max(0,need-have),label:'Γέμισμα buffer…'};
+    }
+    const v=prim.vA,len=Math.max(0.05,p.e-p.s),pos=Math.min(len,Math.max(0,v.currentTime-p.s)),tot=len*S.reps,done=p.rep*len+pos;
+    return {name:'play',frac:Math.min(1,done/tot),rem:Math.max(0,(tot-done)/S.speed),label:`⟲ ${Math.round(len)}s`+(d?` −${d}s`:'')+(S.reps>1?` · ${p.rep+1}/${S.reps}`:'')};
+  }
+  if(CY.phase==='idle')return idle;
+  if(CY.paused)return {name:'pause',frac:0,rem:0,label:'⏸ Παύση'};
+  if(CY.phase==='play'){
+    const pc=CY.pl.find(c=>c.ph==='play')||CY.pl[0]||prim,v=pc.vA,d=isFinite(v.duration)&&v.duration>0?v.duration:(pc.clip?pc.clip.dur:1),rp=pc.rep||0;
+    const total=Math.max(0.001,S.reps*d),done=rp*d+Math.min(d,v.currentTime);
+    return {name:'play',frac:Math.min(1,done/total),rem:Math.max(0,(total-done)/S.speed),label:`▶ Αναπαραγωγή ${v.currentTime.toFixed(1)} / ${d.toFixed(1)}s`+(S.reps>1?` · ${rp+1}/${S.reps}`:'')};
+  }
+  const el=now-CY.t0,f=CY.dur?Math.min(1,el/CY.dur):1,rem=Math.max(0,(CY.dur-el)/1000);
+  if(CY.phase==='rec')return {name:'rec',frac:f,rem,label:`● Καταγραφή ${Math.ceil(rem)}s`};
+  return {name:'wait',frac:f,rem,label:`Αναπαραγωγή σε ${Math.ceil(rem)}s`};
+}
+function tick(){
+  const now=performance.now(),rc=(remoteCode||'').toUpperCase();
+  for(const c of chans()){
+    let msg='';
+    if(!has(c)){
+      msg=c.key==='B'
+        ?`Αναμονή κινητού…<small>Σύνδεση: Ρυθμίσεις → «🧭 Οδηγός σύνδεσης»${rc?' · κωδικός <b>'+rc+'</b>':''}</small>`
+        :'Δεν υπάρχει εικόνα<small>Άνοιξε τις Ρυθμίσεις και έλεγξε την κάμερα</small>';
+    }
+    if(!msg&&S.mode==='loop'&&visible(c)&&c.rb&&!c.rb.showing)msg='Γέμισμα buffer…<small>Το replay ξεκινά σε λίγο</small>';
+    if(c._msg!==msg){c._msg=msg;c.msgEl.innerHTML=msg;}
+  }
+  const prim=visChs().find(has);
+  let chip='',live=false;
+  if(!prim)chip='Χωρίς εικόνα';
+  else if(S.mode==='live'){chip=S.layout==='AB'?'● LIVE · 2 κάμερες':'● LIVE';live=true;}
+  else{const pi=phaseInfo(now);chip=pi.label||'Έναρξη…';live=pi.name==='rec';}
+  const el=$('#chip');el.textContent=chip;el.classList.toggle('live',live);
+}
+let CD_LEN=2*Math.PI*44;
+const CD_LABEL={rec:'Καταγρ.',wait:'Αναμονή',play:'Αναπαρ.',pause:'Παύση'};
+let cdLast='';
+function applyCD(){
+  const c=S.cd,cd=$('#cd'),r=50-c.w/2-1;
+  cd.dataset.pos=c.pos;
+  cd.style.setProperty('--cd-size',c.size+'px');cd.style.setProperty('--cd-op',c.op/100);
+  cd.style.setProperty('--c-rec',c.cRec);cd.style.setProperty('--c-wait',c.cWait);cd.style.setProperty('--c-play',c.cPlay);
+  cd.classList.toggle('nolabel',!c.label);
+  for(const k of ['.bg','.fg']){const e=cd.querySelector(k);e.setAttribute('r',r);e.setAttribute('stroke-width',c.w);}
+  CD_LEN=2*Math.PI*r;
+  cd.querySelector('b').style.fontSize=(c.size*(c.label?0.39:0.46)).toFixed(0)+'px';
+  cd.querySelector('small').style.fontSize=Math.max(9,c.size*0.1).toFixed(0)+'px';
+  const tl=c.pos==='tl',s=document.documentElement.style;
+  s.setProperty('--pip-top',(tl?TH+c.size+14:TH+38)+'px');s.setProperty('--pip-top-n',(tl?14+c.size+14:20)+'px');
+  s.setProperty('--tag-left',(tl?14+c.size+12:12)+'px');s.setProperty('--tag-top',(tl?TH+12:TH-4)+'px');
+  cdLast='';
+}
+function syncCDUI(){
+  const c=S.cd;
+  $$('#segCdPos button').forEach(b=>b.classList.toggle('on',b.dataset.p===c.pos));
+  $('#cdSize').value=c.size;$('#oCdSize').textContent=c.size+'px';
+  $('#cdW').value=c.w;$('#oCdW').textContent=c.w;
+  $('#cdOp').value=c.op;$('#oCdOp').textContent=c.op+'%';
+  $('#cRec').value=c.cRec;$('#cWait').value=c.cWait;$('#cPlay').value=c.cPlay;
+  const l=$('#tCdLabel');l.textContent=c.label?'On':'Off';l.classList.toggle('on',c.label);
+}
+function initCD(){
+  const upd=()=>{save();applyCD();syncCDUI();};
+  $$('#segCdPos button').forEach(b=>b.onclick=()=>{S.cd.pos=b.dataset.p;upd();});
+  $('#cdSize').oninput=e=>{S.cd.size=+e.target.value;upd();};
+  $('#cdW').oninput=e=>{S.cd.w=+e.target.value;upd();};
+  $('#cdOp').oninput=e=>{S.cd.op=+e.target.value;upd();};
+  $('#tCdLabel').onclick=()=>{S.cd.label=!S.cd.label;upd();};
+  for(const [id,k] of [['#cRec','cRec'],['#cWait','cWait'],['#cPlay','cPlay']])$(id).oninput=e=>{S.cd[k]=e.target.value;upd();};
+  $('#bCdReset').onclick=()=>{S.cd=Object.assign({},CD_DEF);upd();toast('Ο κύκλος επανήλθε');};
+  // το μενού γίνεται διάφανο όσο αγγίζεις ρυθμίσεις του κύκλου, για να φαίνεται το αποτέλεσμα
+  let pt;const peek=on=>{clearTimeout(pt);$('#settings').classList.toggle('peek',on);if(on)pt=setTimeout(()=>peek(false),2500);};
+  const box=$('#cdSet');
+  box.addEventListener('pointerdown',e=>{if(e.target.closest('input,button'))peek(true);});
+  ['pointerup','pointercancel','change'].forEach(ev=>box.addEventListener(ev,()=>{clearTimeout(pt);pt=setTimeout(()=>peek(false),700);}));
+  syncCDUI();applyCD();
+}
+let progT=0;
+function progLoop(){
+  const nw=performance.now();
+  if(nw-progT<66){requestAnimationFrame(progLoop);return;}
+  progT=nw;
+  let pi=phaseInfo(nw);
+  const ts=S.mode==='delay'||S.mode==='loop';
+  const demo=$('#settings').classList.contains('open')&&S.phaseBar&&(!ts||pi.name==='idle');
+  if(demo)pi={name:'rec',frac:0.35,rem:6.5,label:''};
+  const show=demo||(ts&&S.phaseBar&&pi.name!=='idle');
+  const cd=$('#cd');cd.hidden=!show;
+  if(show){
+    const num=pi.name==='pause'?'⏸':String(Math.ceil(pi.rem-0.0001));
+    const key=pi.name+'|'+num;
+    if(key!==cdLast){cdLast=key;cd.dataset.p=pi.name;cd.querySelector('b').textContent=num;cd.querySelector('small').textContent=CD_LABEL[pi.name]||'';}
+    cd.querySelector('.fg').setAttribute('stroke-dasharray',(CD_LEN*Math.max(0,1-pi.frac)).toFixed(1)+' '+CD_LEN.toFixed(1));
+  }
+  requestAnimationFrame(progLoop);
+}
+
+/* ---------- Σύνδεση κινητού με κωδικό (δέκτης) ---------- */
+
+/* ---------- Ρυθμίσεις UI ---------- */
+/* ---------- Ρυθμίσεις εικόνας ---------- */
+const IMG_CTL=[['b','Φωτεινότητα',30,200,1,'%'],['c','Αντίθεση',30,200,1,'%'],['s','Κορεσμός',0,250,1,'%'],['h','Απόχρωση',-180,180,1,'°'],['g','Γάμμα (σκιές)',0.4,2.5,0.05,''],['sh','Ευκρίνεια',0,100,1,'%']];
+const imgTargets=()=>S.imgT==='AB'?['A','B']:[S.imgT];
+function applyImg(){
+  for(const c of chans()){
+    const im=S.img[c.key];
+    let f=`brightness(${im.b/100}) contrast(${im.c/100}) saturate(${im.s/100})`;
+    if(im.h)f+=` hue-rotate(${im.h}deg)`;
+    if(im.bw)f+=' grayscale(1)';
+    const fx=im.g!==1||im.sh>0;
+    if(fx){
+      f+=` url(#fx${c.key})`;
+      const ex=(1/im.g).toFixed(3);
+      for(const ch of ['r','g','b'])$('#g'+c.key+'_'+ch).setAttribute('exponent',ex);
+      const a=im.sh/100*1.2,k=[0,-a,0,-a,1+4*a,-a,0,-a,0].map(x=>+x.toFixed(3)).join(' ');
+      $('#sh'+c.key).setAttribute('kernelMatrix',k);
+    }
+    c.pane.style.setProperty('--flt',f);
+  }
+}
+function syncImgUI(){
+  const im=S.img[imgTargets()[0]];
+  $$('#imgRows .irow').forEach(r=>{const k=r.dataset.k,i=r.querySelector('input'),o=r.querySelector('output'),d=IMG_CTL.find(x=>x[0]===k);i.value=im[k];o.textContent=(k==='g'?(+im[k]).toFixed(2):im[k])+d[5];});
+  const bw=$('#tBW');bw.textContent=im.bw?'On':'Off';bw.classList.toggle('on',!!im.bw);
+  $$('#segImgT button').forEach(b=>b.classList.toggle('on',b.dataset.t===S.imgT));
+}
+function initImage(){
+  const box=$('#imgRows');box.innerHTML='';
+  for(const [k,label,min,max,step,unit] of IMG_CTL){
+    const r=document.createElement('div');r.className='irow';r.dataset.k=k;
+    r.innerHTML=`<span>${label}</span><input type="range" min="${min}" max="${max}" step="${step}"><output></output>`;
+    const inp=r.querySelector('input');
+    inp.oninput=()=>{imgTargets().forEach(t=>{S.img[t][k]=+inp.value;});save();applyImg();syncImgUI();};
+    inp.ondblclick=()=>{imgTargets().forEach(t=>{S.img[t][k]=IMG_DEF[k];});save();applyImg();syncImgUI();};
+    const peek=on=>$('#settings').classList.toggle('peek',on);
+    inp.addEventListener('pointerdown',()=>peek(true));
+    ['pointerup','pointercancel','change'].forEach(ev=>inp.addEventListener(ev,()=>peek(false)));
+    box.appendChild(r);
+  }
+  $$('#segImgT button').forEach(b=>b.onclick=()=>{S.imgT=b.dataset.t;syncImgUI();});
+  $('#tBW').onclick=()=>{const v=!S.img[imgTargets()[0]].bw;imgTargets().forEach(t=>{S.img[t].bw=v;});save();applyImg();syncImgUI();};
+  $('#bImgReset').onclick=()=>{imgTargets().forEach(t=>{S.img[t]=Object.assign({},IMG_DEF);});save();applyImg();syncImgUI();toast('Η εικόνα επανήλθε');};
+  syncImgUI();applyImg();
+}
+function hwSetup(){
+  const t=camStream&&camStream.getVideoTracks()[0];
+  const caps=(t&&t.getCapabilities)?t.getCapabilities():{};
+  const rows=$('#hwRows');rows.innerHTML='';
+  const add=(key,label,c,fmt)=>{
+    if(!c||c.min===undefined||c.max===undefined||c.max<=c.min)return;
+    const cur=(t.getSettings&&t.getSettings()[key]);
+    const r=document.createElement('div');r.className='irow hw';
+    r.innerHTML=`<span>${label}</span><input type="range" min="${c.min}" max="${c.max}" step="${c.step||0.1}"><output></output>`;
+    const i=r.querySelector('input'),o=r.querySelector('output');i.value=cur!==undefined?cur:c.min;o.textContent=fmt(+i.value);
+    i.oninput=()=>{o.textContent=fmt(+i.value);t.applyConstraints({advanced:[{[key]:+i.value}]}).catch(()=>{});};
+    rows.appendChild(r);
+  };
+  add('zoom','Οπτικό zoom',caps.zoom,v=>v.toFixed(1)+'×');
+  add('exposureCompensation','Έκθεση',caps.exposureCompensation,v=>(v>0?'+':'')+v.toFixed(1));
+  add('brightness','Φωτ. κάμερας',caps.brightness,v=>String(Math.round(v)));
+  add('contrast','Αντ. κάμερας',caps.contrast,v=>String(Math.round(v)));
+  add('saturation','Κορ. κάμερας',caps.saturation,v=>String(Math.round(v)));
+  add('sharpness','Ευκρ. κάμερας',caps.sharpness,v=>String(Math.round(v)));
+  $('#hwBox').hidden=!rows.children.length;
+}
+function initUI(){
+  $('#bSet').onclick=()=>$('#settings').classList.add('open');
+  $('#bSetClose').onclick=()=>$('#settings').classList.remove('open');
+  $$('#segMode button').forEach(b=>b.onclick=()=>setMode(b.dataset.m));
+  $$('[data-l]').forEach(b=>b.onclick=()=>setLayout(b.dataset.l));
+  $$('#segDir button').forEach(b=>b.onclick=()=>{S.dir=b.dataset.d;S.dirAuto=false;try{localStorage.setItem('vd_dirset','1');}catch(e){}save();applyView();});
+  $('#selCam').onchange=e=>{S.deviceId=e.target.value;startCamera();};
+  $('#selRes').value=String(S.res);
+  $('#selRes').onchange=e=>{S.res=+e.target.value;save();startCamera();};
+  $('#bFlip').onclick=()=>{S.facing=S.facing==='user'?'environment':'user';S.deviceId='';S.mirror=S.facing==='user';save();applyView();startCamera();};
+  $('#tMirror').onclick=()=>{S.mirror=!S.mirror;save();applyView();};
+  $('#tMirrorB').onclick=()=>{S.mirrorB=!S.mirrorB;save();applyView();};
+  $('#tFit').onclick=()=>{S.fit=S.fit==='cover'?'contain':'cover';save();applyView();};
+  $('#tPip').onclick=()=>{S.pip=!S.pip;save();applyView();};
+  $('#bFS').onclick=toggleFS;
+  $('#uiBtn').onclick=()=>setUI(true);
+  // επαναφορά μενού: διπλό πάτημα οπουδήποτε ή πάτημα στην πάνω δεξιά γωνία
+  let lastT=0;
+  document.addEventListener('pointerdown',e=>{
+    if(!document.body.classList.contains('noui'))return;
+    const now=Date.now();
+    if(e.target.id==='hot'||now-lastT<450){
+      setUI(false);lastT=0;e.preventDefault();
+      const swallow=ev=>{ev.stopPropagation();ev.preventDefault();}; // το «click» που ακολουθεί δεν πρέπει να πατήσει κουμπί από κάτω
+      document.addEventListener('click',swallow,true);setTimeout(()=>document.removeEventListener('click',swallow,true),600);
+    }else lastT=now;
+  },true);
+  document.addEventListener('keydown',e=>{if(e.key==='Escape'&&document.body.classList.contains('noui'))setUI(false);});
+  const fsch=()=>{if(!isFS()&&fsHid){setUI(false);}};
+  document.addEventListener('fullscreenchange',fsch);document.addEventListener('webkitfullscreenchange',fsch);
+  $('#bPause').onclick=togglePause;$('#bRestart').onclick=loopRestart;
+  let rt;
+  const bind=(key,rid,oid,min,max,unit)=>{
+    unit=unit||'s';
+    const r=$(rid),o=$(oid);r.value=S[key];o.textContent=S[key]+unit;
+    r.oninput=()=>{S[key]=+r.value;o.textContent=S[key]+unit;save();if(key==='clip'||key==='play'){clearTimeout(rt);rt=setTimeout(()=>{if(S.mode==='delay')cycleStart();},600);}};
+    return(d)=>{r.value=Math.max(min,Math.min(max,+r.value+d));r.oninput();};
+  };
+  const st={clip:bind('clip','#rClip','#oClip',1,60),play:bind('play','#rPlay','#oPlay',1,60),delayA:bind('delayA','#rDelayA','#oDelayA',0,120),delayB:bind('delayB','#rDelayB','#oDelayB',0,120),reps:bind('reps','#rReps','#oReps',1,5,'×')};
+  $$('.sb').forEach(b=>b.onclick=()=>st[b.dataset.k](+b.dataset.d));
+  $('#tPhase').onclick=()=>{S.phaseBar=!S.phaseBar;save();applyView();};
+  $$('#sSpeed button').forEach(b=>b.onclick=()=>setSpeed(+b.dataset.v));setSpeed(S.speed);
+  initImage();
+  initCD();
+  initSplit();initZoom();
+$('#selPosA').onchange=e=>setPos('A',e.target.value);$('#selPosB').onchange=e=>setPos('B',e.target.value);
+  $('#bSwap').onclick=$('#bSwap2').onclick=()=>{S.swap=!S.swap;save();applyView();};
+  $('#bZoomReset').onclick=()=>{zoomReset(CH.A,true);zoomReset(CH.B,true);save();toast('Το zoom επανήλθε');};
+  ['A','B'].forEach(k=>{$('#rZoom'+k).oninput=e=>{zoomCenter(CH[k],+e.target.value);};$('#rZoom'+k).onchange=()=>save();});
+  initDraw();
+}
+let fsHid=false;
+const isFS=()=>!!(document.fullscreenElement||document.webkitFullscreenElement);
+function setUI(hidden){
+  document.body.classList.toggle('noui',hidden);
+  if(hidden){
+    document.body.classList.remove('drawing');$('#bDraw').classList.remove('on');
+    D.sel=null;render();$('#settings').classList.remove('open');
+    toast('Επαναφορά μενού: διπλό πάτημα οπουδήποτε ή πάτημα στην πάνω δεξιά γωνία',3500);
+  }else{fsHid=false;applyView();}
+}
+function toggleFS(){
+  const d=document,el=d.documentElement;
+  if(!isFS()){
+    fsHid=true;setUI(true);
+    const f=el.requestFullscreen||el.webkitRequestFullscreen;
+    if(f){try{const r=f.call(el);if(r&&r.catch)r.catch(()=>{});}catch(e){}}
+  }else{
+    fsHid=false;(d.exitFullscreen||d.webkitExitFullscreen).call(d);setUI(false);
+  }
+}
+
+/* =====================================================================
+   ΣΧΕΔΙΑΣΗ
+   ===================================================================== */
+const cv=$('#draw'),ctx=cv.getContext('2d');
+let W=1,H=1;
+const D={tool:'pen',shapes:[],sel:null,hist:[],act:null,lastTap:0};
+const DEF={color:'#ff3b30',width:5,dash:'solid',fill:false,alpha:1};
+const COLORS=['#ff3b30','#ff9f0a','#ffd60a','#30d158','#0ac8ff','#0a84ff','#ff2d92','#ffffff','#000000'];
+const ICONS={
+  select:'<path d="M5 3l12 8-5.5 1.5L9 18z"/>',
+  pen:'<path d="M4 20l3.5-1L19 7.5 16.5 5 5 16.5z"/>',
+  line:'<path d="M4 20L20 4"/>',
+  arrow:'<path d="M4 20L19 5M10 5h9v9"/>',
+  circle:'<circle cx="12" cy="12" r="8"/>',
+  rect:'<rect x="4" y="5" width="16" height="14" rx="1"/>',
+  text:'<path d="M5 6V4h14v2M12 4v16M9 20h6"/>',
+  undo:'<path d="M9 14L4 9l5-5"/><path d="M4 9h10a6 6 0 0 1 0 12h-3"/>',
+  trash:'<path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/>',
+  clear:'<path d="M3 3l18 18M21 3L3 21"/>'
+};
+const TOOLS=[['select','Επιλογή / μετακίνηση'],['pen','Ελεύθερο'],['line','Γραμμή'],['arrow','Βέλος'],['circle','Κύκλος / έλλειψη'],['rect','Ορθογώνιο'],['text','Κείμενο']];
+const ico=n=>`<svg viewBox="0 0 24 24">${ICONS[n]}</svg>`;
+
+function initDraw(){
+  const tb=$('#tools');
+  TOOLS.forEach(([id,t])=>{const b=document.createElement('button');b.className='btn'+(id===D.tool?' on':'');b.dataset.t=id;b.title=t;b.innerHTML=ico(id);b.onclick=()=>setTool(id);tb.appendChild(b);});
+  const sep=document.createElement('div');sep.style.cssText='height:1px;background:var(--line);margin:2px 0';tb.appendChild(sep);
+  const mk=(icn,title,fn)=>{const b=document.createElement('button');b.className='btn';b.title=title;b.innerHTML=ico(icn);b.onclick=fn;tb.appendChild(b);};
+  mk('undo','Αναίρεση',undo);mk('trash','Διαγραφή επιλεγμένου',delSel);mk('clear','Καθαρισμός όλων',()=>{if(D.shapes.length&&confirm('Να σβηστούν όλα τα σχέδια;')){snap();D.shapes=[];D.sel=null;render();}});
+  const sw=$('#swatches');
+  COLORS.forEach(c=>{const b=document.createElement('button');b.className='sw'+(c===DEF.color?' on':'');b.style.background=c;b.dataset.c=c;b.onclick=()=>{snap();setProp('color',c);};sw.appendChild(b);});
+  $('#colorPick').oninput=e=>setProp('color',e.target.value);
+  $('#colorPick').onpointerdown=snap;
+  $('#pW').onpointerdown=snap;$('#pA').onpointerdown=snap;
+  $('#pW').oninput=e=>setProp('width',+e.target.value);
+  $('#pA').oninput=e=>setProp('alpha',+e.target.value/100);
+  $$('#pDash button').forEach(b=>b.onclick=()=>{snap();setProp('dash',b.dataset.v);});
+  $('#pFill').onclick=()=>{snap();setProp('fill',!(D.sel?D.sel.fill:DEF.fill));};
+  $('#bDraw').onclick=()=>{
+    const on=!document.body.classList.contains('drawing');
+    document.body.classList.toggle('drawing',on);$('#bDraw').classList.toggle('on',on);
+    if(!on){D.sel=null;render();}
+  };
+  new ResizeObserver(resizeCanvas).observe(stage);
+  window.addEventListener('orientationchange',()=>setTimeout(resizeCanvas,300));
+  syncProps();
+}
+function setTool(t){
+  D.tool=t;D.sel=t==='select'?D.sel:null;
+  $$('#tools [data-t]').forEach(b=>b.classList.toggle('on',b.dataset.t===t));
+  syncProps();render();
+}
+function snap(){D.hist.push(JSON.stringify(D.shapes));if(D.hist.length>60)D.hist.shift();}
+function undo(){
+  if(!D.hist.length){toast('Τίποτα για αναίρεση');return;}
+  const id=D.sel&&D.sel.id;D.shapes=JSON.parse(D.hist.pop());D.sel=D.shapes.find(s=>s.id===id)||null;syncProps();render();
+}
+function delSel(){if(!D.sel){toast('Δεν έχει επιλεγεί σχέδιο');return;}snap();D.shapes=D.shapes.filter(s=>s!==D.sel);D.sel=null;syncProps();render();}
+function setProp(k,v){DEF[k]=v;if(D.sel)D.sel[k]=v;syncProps();render();}
+function syncProps(){
+  const s=D.sel||DEF;
+  $$('#swatches .sw').forEach(b=>b.classList.toggle('on',b.dataset.c.toLowerCase()===String(s.color).toLowerCase()));
+  $('#colorPick').value=/^#[0-9a-f]{6}$/i.test(s.color)?s.color:'#ff3b30';
+  $('#pW').value=s.width;$('#oW').textContent=s.width;
+  $('#pA').value=Math.round(s.alpha*100);
+  $$('#pDash button').forEach(b=>b.classList.toggle('on',b.dataset.v===s.dash));
+  $('#pFill').classList.toggle('on',!!s.fill);
+}
+function resizeCanvas(){
+  const r=stage.getBoundingClientRect();const dpr=window.devicePixelRatio||1;
+  W=Math.max(1,r.width);H=Math.max(1,r.height);
+  cv.width=Math.round(W*dpr);cv.height=Math.round(H*dpr);
+  ctx.setTransform(dpr,0,0,dpr,0,0);render();
+}
+
+/* --- γεωμετρία --- */
+const px=p=>[p[0]*W,p[1]*H];
+const fontSize=s=>14+s.width*2.2;
+function textBox(s){
+  ctx.font=`700 ${fontSize(s)}px system-ui,sans-serif`;
+  const lines=String(s.text||'').split('\n');
+  let w=0;lines.forEach(l=>{w=Math.max(w,ctx.measureText(l).width);});
+  return {w:Math.max(w,10),h:lines.length*fontSize(s)*1.2,lines};
+}
+function bbox(s){
+  if(s.type==='text'){const m=textBox(s),[x,y]=px(s.pts[0]);return{x,y,w:m.w,h:m.h};}
+  let x1=1e9,y1=1e9,x2=-1e9,y2=-1e9;
+  for(const p of s.pts){const[x,y]=px(p);x1=Math.min(x1,x);y1=Math.min(y1,y);x2=Math.max(x2,x);y2=Math.max(y2,y);}
+  return{x:x1,y:y1,w:x2-x1,h:y2-y1};
+}
+function handlesOf(s){
+  if(s.type==='line'||s.type==='arrow')return s.pts.map((p,i)=>{const[x,y]=px(p);return{id:i?'b':'a',x,y};});
+  if(s.type==='text')return[];
+  const b=bbox(s),pad=s.type==='pen'?s.width/2+4:0;
+  const x1=b.x-pad,y1=b.y-pad,x2=b.x+b.w+pad,y2=b.y+b.h+pad,cx=(x1+x2)/2,cy=(y1+y2)/2;
+  return[{id:'nw',x:x1,y:y1},{id:'n',x:cx,y:y1},{id:'ne',x:x2,y:y1},{id:'e',x:x2,y:cy},{id:'se',x:x2,y:y2},{id:'s',x:cx,y:y2},{id:'sw',x:x1,y:y2},{id:'w',x:x1,y:cy}];
+}
+function hitHandle(s,p){for(const h of handlesOf(s)){if(Math.hypot(p[0]-h.x,p[1]-h.y)<=28)return h;}return null;}
+function distSeg(p,a,b){
+  const dx=b[0]-a[0],dy=b[1]-a[1],l2=dx*dx+dy*dy;
+  let t=l2?((p[0]-a[0])*dx+(p[1]-a[1])*dy)/l2:0;t=Math.max(0,Math.min(1,t));
+  return Math.hypot(p[0]-(a[0]+t*dx),p[1]-(a[1]+t*dy));
+}
+function hitShape(s,p){
+  const tol=Math.max(16,s.width/2+12);
+  if(s.type==='pen'){const q=s.pts.map(px);if(q.length===1)return Math.hypot(p[0]-q[0][0],p[1]-q[0][1])<tol;for(let i=0;i<q.length-1;i++)if(distSeg(p,q[i],q[i+1])<tol)return true;return false;}
+  if(s.type==='line'||s.type==='arrow')return distSeg(p,px(s.pts[0]),px(s.pts[1]))<tol;
+  const b=bbox(s);
+  if(s.type==='text')return p[0]>=b.x-8&&p[0]<=b.x+b.w+8&&p[1]>=b.y-8&&p[1]<=b.y+b.h+8;
+  if(s.type==='rect'){
+    const inside=p[0]>=b.x-tol&&p[0]<=b.x+b.w+tol&&p[1]>=b.y-tol&&p[1]<=b.y+b.h+tol;
+    if(!inside)return false;if(s.fill)return true;
+    const inner=b.w>2*tol&&b.h>2*tol&&p[0]>b.x+tol&&p[0]<b.x+b.w-tol&&p[1]>b.y+tol&&p[1]<b.y+b.h-tol;
+    return!inner;
+  }
+  if(s.type==='circle'){
+    const cx=b.x+b.w/2,cy=b.y+b.h/2,rx=Math.max(b.w/2,1),ry=Math.max(b.h/2,1),m=Math.min(rx,ry);
+    const d=Math.hypot((p[0]-cx)/rx,(p[1]-cy)/ry);
+    return s.fill?d<=1+tol/m:Math.abs(d-1)*m<tol;
+  }
+  return false;
+}
+
+/* --- σχεδίαση σε canvas --- */
+function drawShape(s){
+  ctx.save();
+  ctx.globalAlpha=s.alpha;ctx.strokeStyle=s.color;ctx.fillStyle=s.color;
+  ctx.lineWidth=s.width;ctx.lineCap='round';ctx.lineJoin='round';
+  const w=s.width;
+  ctx.setLineDash(s.dash==='dashed'?[w*3,w*2]:s.dash==='dotted'?[0.1,w*2.2]:[]);
+  if(s.type==='pen'){
+    const q=s.pts.map(px);
+    ctx.beginPath();
+    if(q.length===1){ctx.arc(q[0][0],q[0][1],w/2,0,Math.PI*2);ctx.fill();}
+    else{
+      ctx.moveTo(q[0][0],q[0][1]);
+      for(let i=1;i<q.length-1;i++){ctx.quadraticCurveTo(q[i][0],q[i][1],(q[i][0]+q[i+1][0])/2,(q[i][1]+q[i+1][1])/2);}
+      ctx.lineTo(q[q.length-1][0],q[q.length-1][1]);ctx.stroke();
+    }
+  }else if(s.type==='line'){
+    const a=px(s.pts[0]),b=px(s.pts[1]);ctx.beginPath();ctx.moveTo(a[0],a[1]);ctx.lineTo(b[0],b[1]);ctx.stroke();
+  }else if(s.type==='arrow'){
+    const a=px(s.pts[0]),b=px(s.pts[1]);
+    const ang=Math.atan2(b[1]-a[1],b[0]-a[0]),hl=Math.max(16,w*4.2),len=Math.hypot(b[0]-a[0],b[1]-a[1]);
+    const back=Math.min(hl*.8,len);
+    ctx.beginPath();ctx.moveTo(a[0],a[1]);ctx.lineTo(b[0]-Math.cos(ang)*back,b[1]-Math.sin(ang)*back);ctx.stroke();
+    ctx.setLineDash([]);ctx.beginPath();ctx.moveTo(b[0],b[1]);
+    ctx.lineTo(b[0]-hl*Math.cos(ang-0.46),b[1]-hl*Math.sin(ang-0.46));
+    ctx.lineTo(b[0]-hl*Math.cos(ang+0.46),b[1]-hl*Math.sin(ang+0.46));
+    ctx.closePath();ctx.fill();
+  }else if(s.type==='rect'){
+    const b=bbox(s);
+    if(s.fill){ctx.globalAlpha=s.alpha*.35;ctx.fillRect(b.x,b.y,b.w,b.h);ctx.globalAlpha=s.alpha;}
+    ctx.strokeRect(b.x,b.y,b.w,b.h);
+  }else if(s.type==='circle'){
+    const b=bbox(s);ctx.beginPath();ctx.ellipse(b.x+b.w/2,b.y+b.h/2,Math.max(b.w/2,.5),Math.max(b.h/2,.5),0,0,Math.PI*2);
+    if(s.fill){ctx.globalAlpha=s.alpha*.35;ctx.fill();ctx.globalAlpha=s.alpha;}
+    ctx.stroke();
+  }else if(s.type==='text'){
+    const m=textBox(s),[x,y]=px(s.pts[0]),fs=fontSize(s);
+    ctx.setLineDash([]);ctx.textBaseline='top';ctx.font=`700 ${fs}px system-ui,sans-serif`;
+    ctx.lineWidth=Math.max(3,fs/6);ctx.strokeStyle='rgba(0,0,0,.65)';
+    m.lines.forEach((l,i)=>{ctx.strokeText(l,x,y+i*fs*1.2);ctx.fillText(l,x,y+i*fs*1.2);});
+  }
+  ctx.restore();
+}
+function render(){
+  ctx.clearRect(0,0,W,H);
+  D.shapes.forEach(drawShape);
+  const s=D.sel;
+  if(s&&document.body.classList.contains('drawing')&&!(D.act&&D.act.k==='create')){
+    ctx.save();ctx.setLineDash([8,6]);ctx.lineWidth=2;ctx.strokeStyle='#0a84ff';
+    if(s.type!=='line'&&s.type!=='arrow'){
+      const b=bbox(s),pad=(s.type==='pen'?s.width/2+4:s.type==='text'?6:0);
+      ctx.strokeRect(b.x-pad,b.y-pad,b.w+2*pad,b.h+2*pad);
+    }
+    ctx.setLineDash([]);
+    for(const h of handlesOf(s)){
+      ctx.beginPath();ctx.arc(h.x,h.y,12,0,Math.PI*2);ctx.fillStyle='#fff';ctx.fill();
+      ctx.lineWidth=3;ctx.strokeStyle='#0a84ff';ctx.stroke();
+    }
+    ctx.restore();
+  }
+}
+
+/* --- αλληλεπίδραση --- */
+const pos=e=>{const r=cv.getBoundingClientRect();return[e.clientX-r.left,e.clientY-r.top];};
+const nrm=p=>[p[0]/W,p[1]/H];
+let uid=1;
+cv.addEventListener('pointerdown',e=>{
+  if(!document.body.classList.contains('drawing')||D.act)return;
+  e.preventDefault();cv.setPointerCapture(e.pointerId);
+  const p=pos(e),n=nrm(p);
+  if(D.sel){
+    const h=hitHandle(D.sel,p);
+    if(h){snap();D.act={k:'resize',id:e.pointerId,h:h.id,orig:JSON.parse(JSON.stringify(D.sel.pts)),box:bbox(D.sel)};return;}
+  }
+  if(D.tool==='select'){
+    let hit=null;
+    for(let i=D.shapes.length-1;i>=0;i--){if(hitShape(D.shapes[i],p)){hit=D.shapes[i];break;}}
+    const now=Date.now();
+    if(hit&&hit===D.sel&&hit.type==='text'&&now-D.lastTap<400){
+      const t=prompt('Κείμενο:',hit.text);if(t!==null&&t.trim()){snap();hit.text=t;}
+      D.lastTap=0;D.act=null;render();return;
+    }
+    D.lastTap=now;
+    D.sel=hit;syncProps();
+    if(hit){snap();D.act={k:'move',id:e.pointerId,start:p,orig:JSON.parse(JSON.stringify(hit.pts))};}
+    render();return;
+  }
+  if(D.tool==='text'){
+    const t=prompt('Κείμενο:');if(!t||!t.trim())return;
+    snap();const s={id:uid++,type:'text',pts:[n],text:t,...DEF};D.shapes.push(s);D.sel=s;syncProps();render();return;
+  }
+  snap();
+  const type=D.tool;
+  const s={id:uid++,type,pts:type==='pen'?[n]:[n,n.slice()],...DEF};
+  if(type==='line'||type==='arrow'||type==='pen')s.fill=false;
+  D.shapes.push(s);D.sel=s;D.act={k:'create',id:e.pointerId,s};render();
+});
+cv.addEventListener('pointermove',e=>{
+  const a=D.act;if(!a||a.id!==e.pointerId)return;
+  e.preventDefault();const p=pos(e);
+  if(a.k==='create'){
+    const s=a.s;
+    if(s.type==='pen'){const last=px(s.pts[s.pts.length-1]);if(Math.hypot(p[0]-last[0],p[1]-last[1])>2)s.pts.push(nrm(p));}
+    else s.pts[1]=nrm(p);
+  }else if(a.k==='move'){
+    const dx=(p[0]-a.start[0])/W,dy=(p[1]-a.start[1])/H;
+    D.sel.pts=a.orig.map(q=>[q[0]+dx,q[1]+dy]);
+  }else if(a.k==='resize'){
+    const s=D.sel;
+    if(a.h==='a')s.pts[0]=nrm(p);
+    else if(a.h==='b')s.pts[1]=nrm(p);
+    else{
+      const b=a.box;let x1=b.x,y1=b.y,x2=b.x+b.w,y2=b.y+b.h;
+      if(a.h.includes('w'))x1=p[0];if(a.h.includes('e'))x2=p[0];
+      if(a.h.includes('n'))y1=p[1];if(a.h.includes('s'))y2=p[1];
+      const nb={x:Math.min(x1,x2),y:Math.min(y1,y2),w:Math.max(Math.abs(x2-x1),2),h:Math.max(Math.abs(y2-y1),2)};
+      s.pts=a.orig.map(q=>{
+        const[ox,oy]=px(q);
+        const fx=b.w<1?.5:(ox-b.x)/b.w,fy=b.h<1?.5:(oy-b.y)/b.h;
+        return[(nb.x+fx*nb.w)/W,(nb.y+fy*nb.h)/H];
+      });
+    }
+  }
+  render();
+});
+function endAct(e){
+  const a=D.act;if(!a||a.id!==e.pointerId)return;
+  D.act=null;
+  if(a.k==='create'){
+    const s=a.s,b=bbox(s);
+    const tiny=s.type!=='pen'&&Math.max(b.w,b.h)<6;
+    if(tiny){D.shapes=D.shapes.filter(x=>x!==s);D.sel=null;D.hist.pop();}
+  }
+  syncProps();render();
+}
+cv.addEventListener('pointerup',endAct);
+cv.addEventListener('pointercancel',endAct);
+
+/* =====================================================================
+   ΚΙΝΗΤΟ (πομπός)
+   ===================================================================== */
+/* ---------- PWA: πλήρης οθόνη + service worker ---------- */
+const FSK='vd_autofs';
+const autoFS=()=>{try{return localStorage.getItem(FSK)!=='0';}catch(e){return true;}};
+function reqFS(){if(isFS())return;const el=document.documentElement,f=el.requestFullscreen||el.webkitRequestFullscreen;if(f){try{const r=f.call(el);if(r&&r.catch)r.catch(()=>{});}catch(e){}}}
+function syncFS(){const b=$('#tAutoFS');b.textContent=autoFS()?'On':'Off';b.classList.toggle('on',autoFS());}
+$('#bFS2').onclick=()=>{$('#settings').classList.remove('open');toggleFS();};
+$('#tAutoFS').onclick=()=>{try{localStorage.setItem(FSK,autoFS()?'0':'1');}catch(e){}syncFS();};
+syncFS();
+if('serviceWorker' in navigator&&/^https?:$/.test(location.protocol))window.addEventListener('load',()=>navigator.serviceWorker.register('sw.js').catch(()=>{}));
+if(location.hash==='#tablet')enterTablet();
+</script>
+</body>
+</html>
